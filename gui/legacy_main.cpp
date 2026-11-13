@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 #include "widgets.hpp"
-#include "session.hpp"
+#include "../desktop/power.hpp"
 #include "laptop.hpp"
 #include <QApplication>
 #include <QButtonGroup>

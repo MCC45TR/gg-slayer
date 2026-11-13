@@ -1,6 +1,6 @@
 Name:           slayerctl
 Version:        0.1.1
-Release:        4%{?dist}
+Release:        5%{?dist}
 Summary:        Game Garaj Slayer hardware control backend
 License:        MIT AND LGPL-2.1-or-later
 URL:            https://github.com/MCC45TR/gg-slayer
@@ -97,6 +97,9 @@ desktop-file-validate %{buildroot}%{_datadir}/applications/slayer-control-gtk.de
 %postun
 %systemd_postun slayerctl.service slayerctl-resume.service
 %udev_rules_update
+%posttrans
+/usr/bin/systemctl try-restart slayerctl-control.service >/dev/null 2>&1 || :
+%{_libexecdir}/slayerctl-desktop --restart-session >/dev/null 2>&1 || :
 
 %files
 %license LICENSE tools/COPYING.LGPL-2.1

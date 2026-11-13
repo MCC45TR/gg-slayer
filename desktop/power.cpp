@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-#include "session.hpp"
+#include "power.hpp"
 #include <QDBusArgument>
 #include <QDBusConnection>
 #include <QDBusInterface>

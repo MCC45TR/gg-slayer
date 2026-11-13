@@ -214,6 +214,14 @@ void configuration(const Io&io,const std::vector<std::string>&a){
     saveText(io,file,text);
     if(!io.fixture()&&chmod(io.path(file).c_str(),0600))throw Error("Ayar dosyası izinleri uygulanamadı.");
     std::error_code cacheError;fs::remove(io.path("/run/slayerctl/power-state"),cacheError);
+    if(!io.fixture()){
+        bool sessionChanged=false;
+        for(const auto& key:{"keyboard_idle_dim","keyboard_idle_timeout","lighting_owner","performance_sync"}){
+            const auto before=previous.find(key),after=cfg.find(key);
+            if((before==previous.end())!=(after==cfg.end())||(before!=previous.end()&&after!=cfg.end()&&before->second!=after->second))sessionChanged=true;
+        }
+        if(sessionChanged)capture({"/usr/bin/systemctl","--no-block","start","slayerctl-control.service"},5000);
+    }
     std::cout<<"Ayar kaydedildi. Şimdi uygulamak için: sudo slayerctl apply-config\n";
 }
 }

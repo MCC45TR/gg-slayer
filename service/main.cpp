@@ -136,7 +136,7 @@ public:
         QDBusConnection::systemBus().connect("org.freedesktop.UPower","/org/freedesktop/UPower/KbdBacklight","org.freedesktop.UPower.KbdBacklight","BrightnessChanged",this,SLOT(keyboardBrightnessChanged(int)));
         QDBusConnection::systemBus().connect("org.freedesktop.login1","/org/freedesktop/login1/seat/seat0","org.freedesktop.DBus.Properties","PropertiesChanged",this,SLOT(seatChanged(QString,QVariantMap,QStringList)));
         QDBusConnection::systemBus().connect("org.freedesktop.login1","/org/freedesktop/login1","org.freedesktop.login1.Manager","PrepareForSleep",this,SLOT(prepareForSleep(bool)));
-        QTimer::singleShot(0,this,[this]{readPower();reloadSync();reconcile();});
+        QTimer::singleShot(0,this,[this]{readPower();reloadSync();reconcile();activateSession();});
     }
     ~Service()override{if(socketFd>=0)close(socketFd);}
 private Q_SLOTS:
