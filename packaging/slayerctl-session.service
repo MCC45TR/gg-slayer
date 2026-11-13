@@ -1,0 +1,15 @@
+[Unit]
+Description=Slayer ctl desktop activity and integration bridge
+PartOf=graphical-session.target
+After=graphical-session.target
+
+[Service]
+Type=dbus
+BusName=org.gamegaraj.Slayer.Session1
+ExecStart=/usr/libexec/slayerctl-session
+NoNewPrivileges=yes
+RestrictAddressFamilies=AF_UNIX
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+Restart=on-failure
+RestartSec=5

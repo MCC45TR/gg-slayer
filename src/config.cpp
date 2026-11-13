@@ -19,6 +19,11 @@ static void validate(const std::string&k,const std::string&v) {
     else if(k=="battery_profile"){if(v!="high-capacity"&&v!="balanced"&&v!="stationary")throw Error("Geçersiz pil koruma profili.");}
     else if(k=="cpu_boost"||k=="cpu_smt"||k=="fn_lock"||k=="usb_charging"||k=="camera"){if(v!="on"&&v!="off")throw Error(k+" on/off olmalı.");}
     else if(k=="performance_sync"){if(v!="on"&&v!="off")throw Error("Eşitleme on/off olmalı.");}
+    else if(k=="keyboard_idle_dim"){if(v!="on"&&v!="off")throw Error("Beklemede kısma on/off olmalı.");}
+    else if(k=="keyboard_idle_timeout"){
+        const std::vector<std::string> allowed{"5","10","15","30","60","120","180","300","600","900","1200","1800"};
+        if(std::find(allowed.begin(),allowed.end(),v)==allowed.end())throw Error("Desteklenmeyen bekleme süresi.");
+    }
     else if(k=="lighting_owner"){if(v!="kde"&&v!="accent"&&v!="custom")throw Error("Geçersiz ışık yöneticisi.");}
     else if(k=="brightness_owner"){if(v!="kde"&&v!="custom")throw Error("Geçersiz parlaklık yöneticisi.");}
     else if(k=="fan_mode"){if(v!="auto"&&v!="boost")throw Error("fan_mode auto/boost olmalı.");}

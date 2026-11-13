@@ -25,7 +25,7 @@ case "$spec_name" in
   tar -czf "$work/SOURCES/slayerctl_r9t.tar.gz" -C "$stage" .
   ;;
  ite8291r3-kmod.spec)
-  tar -czf "$work/SOURCES/ite_8291.tar.gz" -C "$root/kernel/ite8291" Kbuild ite_8291.c color_contract.h color_model.h COPYING
+  tar -czf "$work/SOURCES/ite_8291.tar.gz" -C "$root/kernel/ite8291" Kbuild ite_8291.c color_contract.h color_model.h brightness_contract.h COPYING
   ;;
  *) echo 'Unsupported COPR source target' >&2;exit 2;;
 esac

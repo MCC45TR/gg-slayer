@@ -1,0 +1,4 @@
+[D-BUS Service]
+Name=org.gamegaraj.Slayer.Session1
+Exec=/usr/libexec/slayerctl-session
+SystemdService=slayerctl-session.service

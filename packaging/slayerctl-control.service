@@ -6,6 +6,7 @@ After=dbus.service systemd-modules-load.service
 Type=dbus
 BusName=org.gamegaraj.Slayer1
 ExecStart=/usr/libexec/slayerctl-service
+ExecStopPost=-/usr/bin/slayerctl keyboard idle-reset
 User=root
 RuntimeDirectory=slayerctl
 RuntimeDirectoryMode=0700

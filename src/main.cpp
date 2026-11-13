@@ -187,6 +187,14 @@ int slayerMain(int argc,char**argv){
             if(io.fixture())throw slayer::Error("Test kipinde sistem D-Bus'una erişilmez.",4);
             if(io.dry())std::cout<<"Önizleme: mevcut KDE/GNOME güç servisi isteği; firmware/EC yazması yok.\n";
             else {args.insert(args.begin(),"/usr/libexec/slayerctl-desktop");std::cout<<slayer::capture(args,7000)<<'\n';}
+        }else if(command=="idle"||command=="desktop"){
+            if(helper||io.fixture())throw slayer::Error("Bu komut kullanıcı oturumunda çalıştırılmalı.");
+            if(command=="idle")args.insert(args.begin(),"--idle");
+            else if(args.size()==2&&args[0]=="settings")args={"--settings",args[1]};
+            else if(args.size()==1&&args[0]=="reboot")args={"--reboot"};
+            else throw slayer::Error("Kullanım: desktop settings display|touchpad|power | desktop reboot");
+            if(io.dry())std::cout<<"Önizleme: ctl masaüstü bağlantısı.\n";
+            else{args.insert(args.begin(),"/usr/libexec/slayerctl-desktop");std::cout<<slayer::capture(args,95000);}
         }else if(command=="service"){
             if(io.fixture()||(!args.empty()&&(args.size()!=1||args[0]!="status")))throw slayer::Error("Kullanım: service status (gerçek sistemde)");
             if(io.dry())std::cout<<"Önizleme: systemd hizmet durumu okunacak.\n";

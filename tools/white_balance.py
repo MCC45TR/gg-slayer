@@ -131,8 +131,8 @@ def gui():
             self.read_buffer=b''
             self.was_kameleon=False
             try:
-                self.was_kameleon=subprocess.check_output(['/usr/bin/qdbus-qt6','org.kde.kded6','/modules/kameleon','org.kde.kameleon.isEnabled'],text=True,timeout=2).strip()=='true'
-                if self.was_kameleon:subprocess.run(['/usr/bin/qdbus-qt6','org.kde.kded6','/modules/kameleon','org.kde.kameleon.setEnabled','false'],check=True,timeout=2)
+                self.was_kameleon=subprocess.check_output(['/usr/bin/slayerctl','keyboard','accent','status'],text=True,timeout=2).strip()=='true'
+                if self.was_kameleon:subprocess.run(['/usr/bin/slayerctl','keyboard','accent','off'],check=True,timeout=2)
             except (OSError,subprocess.SubprocessError): pass
             try: initial=triplet(json.loads(result.read_text())['white_point'])
             except (OSError,ValueError,KeyError): initial=[255,255,255]
@@ -197,7 +197,7 @@ def gui():
                     self.status.setText('Beyaz noktası uygulanıyor ve şifreli ayarlara kaydediliyor…')
         def restore_accent(self):
             if self.was_kameleon:
-                subprocess.run(['/usr/bin/qdbus-qt6','org.kde.kded6','/modules/kameleon','org.kde.kameleon.setEnabled','true'],timeout=2)
+                subprocess.run(['/usr/bin/slayerctl','keyboard','accent','on'],timeout=2)
                 self.was_kameleon=False
         def persisted(self,code,*_):
             if code==0:

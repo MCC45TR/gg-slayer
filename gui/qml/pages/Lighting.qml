@@ -45,6 +45,32 @@ PageBody {
         Loader { Layout.fillWidth: true; active: device.info.saved_brightness_owner === "custom"; sourceComponent: Brightness { } }
         QQC2.Label { text: qsTr("İlk açılışta mevcut ışıklar değiştirilmez. Yönetim tercihinizi siz seçersiniz."); visible: !device.info.saved_lighting_owner; wrapMode: Text.WordWrap; Layout.fillWidth: true }
     }
+    Section {
+        Layout.fillWidth: true
+        title: qsTr("Güç tasarrufunda bekleme")
+        subtitle: qsTr("Kullanılmadığında ışık beş saniyede en düşük seviyeye iner. Dokunduğunuzda seçili parlaklığa yumuşakça döner. Kapalı klavye kapalı kalır.")
+        Setting {
+            title: qsTr("Beklemede ışığı kıs")
+            description: qsTr("Yalnızca güç tasarrufu profilinde çalışır. Masaüstünün parlaklık değeri değişmez.")
+            options: ["on", "off"]; labels: [qsTr("Açık"), qsTr("Kapalı")]
+            current: device.info.saved_keyboard_idle_dim || "off"
+            enabled: device.info.keyboard_idle_available === "1"
+            onChosen: value => control.apply(["config", "set", "keyboard_idle_dim", value])
+        }
+        Setting {
+            title: qsTr("Bekleme süresi")
+            options: ["5", "10", "15", "30", "60", "120", "180", "300", "600", "900", "1200", "1800"]
+            labels: [qsTr("5 saniye"), qsTr("10 saniye"), qsTr("15 saniye"), qsTr("30 saniye"), qsTr("1 dakika"), qsTr("2 dakika"), qsTr("3 dakika"), qsTr("5 dakika"), qsTr("10 dakika"), qsTr("15 dakika"), qsTr("20 dakika"), qsTr("30 dakika")]
+            current: device.info.saved_keyboard_idle_timeout || "30"
+            enabled: device.info.saved_keyboard_idle_dim === "on"
+            onChosen: value => control.apply(["config", "set", "keyboard_idle_timeout", value])
+        }
+        QQC2.Label {
+            visible: device.info.keyboard_idle_available !== "1"
+            text: qsTr("Beklemede kısma için güncel Slayer klavye sürücüsü gerekli.")
+            Layout.fillWidth: true; wrapMode: Text.WordWrap
+        }
+    }
     QQC2.CheckBox { id: whiteBalance; objectName: "whiteBalanceOptions"; text: qsTr("Renk kalibrasyonu") }
     Loader {
         Layout.fillWidth: true

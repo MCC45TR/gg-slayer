@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Slayer desktop integration
+Exec=/usr/libexec/slayerctl-desktop --reload-session
+Icon=input-keyboard
+NoDisplay=true
+X-GNOME-Autostart-Phase=Applications

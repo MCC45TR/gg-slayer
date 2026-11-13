@@ -103,6 +103,7 @@
 #include <linux/workqueue.h>
 #include "color_contract.h"
 #include "color_model.h"
+#include "brightness_contract.h"
 
 // USB HID control data write size
 #define HID_DATA_SIZE 8
@@ -141,6 +142,7 @@ struct ite8291_driver_data_t {
 	bool stopping;
 	bool powered;
 	u8 mode, speed, behaviour;
+	u16 brightness_scale;
 	u8 white_point[3];
 	u8 color_profile[SLAYER_COLOR_MODEL_MAX];
 	u16 color_profile_size;
@@ -415,6 +417,12 @@ static void cache_brightness(struct ite8291_driver_data_t *driver, u8 brightness
 		for (col = 0; col < ITE8291_LEDS_PER_ROW_MAX; ++col)
 			WRITE_ONCE(data->mcled_cdevs[row][col].led_cdev.brightness, brightness);
 }
+/* A transient physical limit. Never change the LED class value consumed by
+ * UPower/PowerDevil, and never emit a brightness notification for an idle fade. */
+static u8 effective_brightness(struct ite8291_driver_data_t *driver, u8 value)
+{
+	return slayer_effective_brightness(value, driver->brightness_scale);
+}
 static int flush_frame(struct ite8291_driver_data_t *driver)
 {
 	int ret = 0;
@@ -458,10 +466,10 @@ static int leds_set_brightness_mc(struct led_classdev *led_cdev, enum led_bright
 		if (driver->color_dirty) mod_delayed_work(system_wq, &driver->frame_work, msecs_to_jiffies(16));
 		else if (brightness != previous) {
 			if (!driver->powered && brightness) {
-				u8 command[] = {8, 2, driver->mode, driver->speed, brightness, 8, driver->behaviour, 0};
+				u8 command[] = {8, 2, driver->mode, driver->speed, effective_brightness(driver, brightness), 8, driver->behaviour, 0};
 				ret = ite8291_write_control(hdev, command);
 				if (!ret) driver->powered = true;
-			} else ret = ite8291_write_brightness(hdev, brightness);
+			} else ret = ite8291_write_brightness(hdev, effective_brightness(driver, brightness));
 			if (!ret) {
 				driver->brightness_count++;
 				led_classdev_notify_brightness_hw_changed(&data->mcled_cdevs[0][0].led_cdev, brightness);
@@ -590,10 +598,10 @@ static int ite8291_perkey_write_state(struct hid_device *hdev)
 	struct ite8291_driver_data_perkey_t *device_data = driver_data->device_data;
 	int ret;
 	if (driver_data->mode == ITE8291_PARAM_MODE_USER) {
-		ret = ite8291_write_rows(hdev, device_data->row_data, device_data->brightness);
+		ret = ite8291_write_rows(hdev, device_data->row_data, effective_brightness(driver_data, device_data->brightness));
 	} else {
 		u8 command[] = {8, driver_data->powered ? 2 : 1, driver_data->mode,
-			driver_data->speed, device_data->brightness, 8, driver_data->behaviour, 0};
+			driver_data->speed, effective_brightness(driver_data, device_data->brightness), 8, driver_data->behaviour, 0};
 		ret = ite8291_write_control(hdev, command);
 	}
 	if (!ret && driver_data->mode == ITE8291_PARAM_MODE_USER) driver_data->powered = true;
@@ -820,7 +828,7 @@ static ssize_t hardware_effect_store(struct device *device, struct device_attrib
 	if (d->device_buffer_input || d->stopping) { ret = -EBUSY; goto out; }
 	memset(command, 0, sizeof(command));
 	command[0] = 8; command[1] = mode ? 2 : 1;
-	if (mode) { command[2] = mode; command[3] = speed; command[4] = brightness; command[5] = 8; command[6] = direction; }
+	if (mode) { command[2] = mode; command[3] = speed; command[4] = effective_brightness(d, brightness); command[5] = 8; command[6] = direction; }
 	ret = ite8291_write_control(hdev, command);
 	if (!ret) {
 		d->mode = mode ? mode : d->mode; d->speed = speed; d->behaviour = direction;
@@ -835,6 +843,35 @@ out:
 	return ret ? ret : size;
 }
 static DEVICE_ATTR_RW(hardware_effect);
+static ssize_t brightness_scale_show(struct device *device, struct device_attribute *attr, char *buf)
+{
+	struct ite8291_driver_data_t *d = hid_get_drvdata(to_hid_device(device));
+	return sysfs_emit(buf, "%u\n", READ_ONCE(d->brightness_scale));
+}
+static ssize_t brightness_scale_store(struct device *device, struct device_attribute *attr, const char *buf, size_t size)
+{
+	struct hid_device *hdev = to_hid_device(device);
+	struct ite8291_driver_data_t *d = hid_get_drvdata(hdev);
+	struct ite8291_driver_data_perkey_t *data = d->device_data;
+	unsigned int scale;
+	u8 previous, next;
+	int ret = 0;
+	if (kstrtouint(buf, 10, &scale) || scale < 1 || scale > 1000) return -EINVAL;
+	mutex_lock(&d->io_lock);
+	if (d->stopping) { ret = -ENODEV; goto out; }
+	previous = effective_brightness(d, data->brightness);
+	next = slayer_effective_brightness(data->brightness, scale);
+	if (previous != next && d->powered) {
+		ret = ite8291_write_brightness(hdev, next);
+		if (!ret) d->brightness_count++;
+	}
+	if (!ret) d->brightness_scale = scale;
+	d->last_error = ret;
+out:
+	mutex_unlock(&d->io_lock);
+	return ret ? ret : size;
+}
+static DEVICE_ATTR_RW(brightness_scale);
 static ssize_t transfer_stats_show(struct device *device, struct device_attribute *attr, char *buf)
 {
 	struct ite8291_driver_data_t *d = hid_get_drvdata(to_hid_device(device));
@@ -947,6 +984,7 @@ DEVICE_ATTR_RW(buffer_input);
 static struct attribute *control_group_attrs[] = {
 	&dev_attr_buffer_input.attr,
 	&dev_attr_hardware_effect.attr,
+	&dev_attr_brightness_scale.attr,
 	&dev_attr_transfer_stats.attr,
 	&dev_attr_frame_color.attr,
 	&dev_attr_white_point.attr,
@@ -990,6 +1028,7 @@ static int driver_probe_callb(struct hid_device *hdev, const struct hid_device_i
 	INIT_DELAYED_WORK(&ite8291_driver_data->frame_work, write_frame_work);
 	ite8291_driver_data->mode = ITE8291_PARAM_MODE_USER;
 	ite8291_driver_data->speed = 5;
+	ite8291_driver_data->brightness_scale = 1000;
 	memset(ite8291_driver_data->white_point, 255, 3);
 
 	result = ite8291_driver_data_setup(hdev);
@@ -1099,4 +1138,4 @@ MODULE_AUTHOR("TUXEDO Computers GmbH <tux@tuxedocomputers.com>");
 MODULE_DESCRIPTION("Driver for ITE Device(8291) RGB LED keyboard backlight.");
 MODULE_LICENSE("GPL");
 
-MODULE_VERSION("0.0.20261113.4");
+MODULE_VERSION("0.0.20261114.1");

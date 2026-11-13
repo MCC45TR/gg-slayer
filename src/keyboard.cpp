@@ -29,6 +29,14 @@ static std::array<int,3> parseColor(std::string s) {
     return {static_cast<int>((value>>16)&255),static_cast<int>((value>>8)&255),static_cast<int>(value&255)};
 }
 void keyboard(const Io &io,const std::vector<std::string>&a) {
+    if(a==std::vector<std::string>{"idle-reset"}){
+        if(geteuid()!=0&&!io.fixture())throw Error("Geçici parlaklık ölçeğini yalnız servis sıfırlayabilir.",3);
+        for(const auto& name:io.list("/sys/bus/hid/devices"))if(name.starts_with("0003:048D:600B.")){
+            const auto path="/sys/bus/hid/devices/"+name+"/controls/brightness_scale";
+            if(io.exists(path))io.write(path,"1000\n");
+        }
+        return;
+    }
     if(!a.empty()&&a[0]=="accent") {
         if(a.size()!=2||(a[1]!="on"&&a[1]!="off"&&a[1]!="status"))throw Error("Kullanım: keyboard accent on|off|status");
         if(a[1]=="on")io.requireCompatible();

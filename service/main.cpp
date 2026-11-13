@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 #include "command.hpp"
+#include "idle_dimmer.hpp"
 #include "../src/controls.hpp"
 #include "../src/profile_sync.hpp"
 #include <QCoreApplication>
@@ -10,6 +11,9 @@
 #include <QSet>
 #include <QDBusMessage>
 #include <QDBusVariant>
+#include <QDBusInterface>
+#include <QDBusArgument>
+#include <QDBusReply>
 #include <QFileSystemWatcher>
 #include <QProcess>
 #include <QSocketNotifier>
@@ -19,6 +23,7 @@
 #include <linux/netlink.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <systemd/sd-login.h>
 
 class Service final:public QObject,protected QDBusContext {
     Q_OBJECT
@@ -31,15 +36,44 @@ class Service final:public QObject,protected QDBusContext {
     int socketFd=-1;
     bool authorizing=false;
     bool syncEnabled=false;
+    IdleDimmer dimmer;
+    QString idleOwner,desktopProfile;
+    QStringList desktopChoices;
+    bool powerAvailable=false,idleEnabled=false;
+    unsigned idleTimeout=30;
+    std::map<std::string,std::string> settings;
+    static constexpr auto powerService="org.freedesktop.UPower.PowerProfiles";
+    void readPower(){
+        QDBusInterface props(powerService,"/org/freedesktop/UPower/PowerProfiles","org.freedesktop.DBus.Properties",QDBusConnection::systemBus());props.setTimeout(2000);
+        QDBusReply<QVariantMap> result=props.call("GetAll",powerService);
+        powerAvailable=result.isValid();desktopChoices.clear();desktopProfile.clear();
+        if(powerAvailable){
+            desktopProfile=result.value().value("ActiveProfile").toString();
+            const auto array=qvariant_cast<QDBusArgument>(result.value().value("Profiles"));
+            array.beginArray();while(!array.atEnd()){QVariantMap profile;array>>profile;desktopChoices.append(profile.value("Profile").toString());}array.endArray();
+        }
+    }
+    bool activeUser(const QString& sender){
+        const auto uid=QDBusConnection::systemBus().interface()->serviceUid(sender);
+        uid_t active=0;char* session=nullptr;
+        const bool match=uid.isValid()&&sd_seat_get_active("seat0",&session,&active)>=0&&active!=0&&active==uid.value();
+        free(session);return match;
+    }
+    void releaseIdle(){idleOwner.clear();dimmer.reset();}
+    void activateSession(){QProcess::startDetached("/usr/libexec/slayerctl-desktop",{"--reload-session"});}
     QString syncOrigin,syncError,expectedDesktop,expectedHardware;
     void reloadSync(){
-        auto cfg=ctlCommand({"config","show"});
-        const bool enabled=cfg.ok&&cfg.output.split(u'\n').contains("performance_sync=on");
+        try{settings=slayer::configurationValues(slayer::Io({}));}catch(const slayer::Error&){settings.clear();}
+        const bool enabled=settings.contains("performance_sync")&&settings.at("performance_sync")=="on";
+        idleEnabled=settings.contains("keyboard_idle_dim")&&settings.at("keyboard_idle_dim")=="on";
+        idleTimeout=settings.contains("keyboard_idle_timeout")?unsigned(std::stoi(settings.at("keyboard_idle_timeout"))):30u;
+        if(!idleEnabled)dimmer.fade(false);
         const bool newlyEnabled=enabled&&!syncEnabled;
         syncEnabled=enabled;
         if(!enabled){syncError.clear();expectedDesktop.clear();expectedHardware.clear();syncOrigin.clear();}
         if(newlyEnabled)syncOrigin="hardware";
         touch();
+        Q_EMIT SessionSettingsChanged();
     }
     void reconcile(){
         if(!syncEnabled||syncOrigin.isEmpty())return;
@@ -66,9 +100,9 @@ class Service final:public QObject,protected QDBusContext {
     void touch(){if(subscribers.isEmpty()&&!authorizing&&!syncEnabled)idle.start(30000);else idle.stop();}
     QString state(){
         auto r=ctlCommand({"ui-data"});if(!r.ok)return {};
-        auto config=ctlCommand({"config","show"});
-        if(config.ok){for(const auto& line:config.output.split(u'\n')){auto at=line.indexOf(u'=');if(at>0)r.output+="value\tsaved_"+line.left(at)+"\t"+line.mid(at+1)+"\n";}}
-        else r.output+="value\tconfig_error\tŞifreli ayarlar açılamadı. Yönetici doğrulamasıyla TPM kurtarma gerekir.\n";
+        for(const auto& [key,value]:settings)r.output+="value\tsaved_"+QString::fromStdString(key)+"\t"+QString::fromStdString(slayer::displayText(value))+"\n";
+        r.output+="value\tdesktop_profile\t"+desktopProfile+"\nvalue\tdesktop_choices\t"+desktopChoices.join(u' ')+"\nvalue\tdesktop_available\t"+(powerAvailable?"1":"0")+"\n";
+        r.output+="value\tkeyboard_idle_available\t"+(dimmer.available()?QString("1"):QString("0"))+"\n";
         if(!syncError.isEmpty())r.output+="value\tperformance_sync_error\t"+QString::fromStdString(slayer::displayText(syncError.toStdString()))+"\n";
         cached=r.output;return cached;
     }
@@ -76,11 +110,11 @@ class Service final:public QObject,protected QDBusContext {
 public:
     Service(){
         clients.setConnection(QDBusConnection::systemBus());clients.setWatchMode(QDBusServiceWatcher::WatchForUnregistration);
-        connect(&clients,&QDBusServiceWatcher::serviceUnregistered,this,[this](const QString& name){subscribers.remove(name);clients.removeWatchedService(name);touch();});
+        connect(&clients,&QDBusServiceWatcher::serviceUnregistered,this,[this](const QString& name){if(name==idleOwner)releaseIdle();subscribers.remove(name);clients.removeWatchedService(name);touch();});
         idle.setSingleShot(true);connect(&idle,&QTimer::timeout,qApp,&QCoreApplication::quit);touch();
         debounce.setSingleShot(true);connect(&debounce,&QTimer::timeout,this,[this]{reconcile();Q_EMIT StateChanged();});
         for(const auto& p:{"/etc/slayerctl","/etc/slayerctl/rgb-profiles"})if(QFile::exists(p))files.addPath(p);
-        connect(&files,&QFileSystemWatcher::directoryChanged,this,[this]{reloadSync();changed();});
+        connect(&files,&QFileSystemWatcher::directoryChanged,this,[this]{reloadSync();activateSession();changed();});
         // Kernel uevents only. Accept no userspace-injected packets as hardware truth.
         socketFd=socket(AF_NETLINK,SOCK_DGRAM|SOCK_NONBLOCK|SOCK_CLOEXEC,NETLINK_KOBJECT_UEVENT);
         sockaddr_nl address{};address.nl_family=AF_NETLINK;address.nl_groups=1;
@@ -98,21 +132,46 @@ public:
         }
         QDBusConnection::systemBus().connect("org.freedesktop.UPower.PowerProfiles","/org/freedesktop/UPower/PowerProfiles","org.freedesktop.DBus.Properties","PropertiesChanged",this,SLOT(powerChanged(QString,QVariantMap,QStringList)));
         QDBusConnection::systemBus().connect("org.freedesktop.UPower","/org/freedesktop/UPower/KbdBacklight","org.freedesktop.UPower.KbdBacklight","BrightnessChanged",this,SLOT(keyboardBrightnessChanged(int)));
-        QTimer::singleShot(0,this,[this]{reloadSync();reconcile();});
+        QDBusConnection::systemBus().connect("org.freedesktop.login1","/org/freedesktop/login1/seat/seat0","org.freedesktop.DBus.Properties","PropertiesChanged",this,SLOT(seatChanged(QString,QVariantMap,QStringList)));
+        QDBusConnection::systemBus().connect("org.freedesktop.login1","/org/freedesktop/login1","org.freedesktop.login1.Manager","PrepareForSleep",this,SLOT(prepareForSleep(bool)));
+        QTimer::singleShot(0,this,[this]{readPower();reloadSync();reconcile();});
     }
     ~Service()override{if(socketFd>=0)close(socketFd);}
 private Q_SLOTS:
+    void seatChanged(const QString&,const QVariantMap& values,const QStringList&){if(values.contains("ActiveSession")&&!idleOwner.isEmpty()&&!activeUser(idleOwner))releaseIdle();}
+    void prepareForSleep(bool sleeping){if(sleeping)releaseIdle();else Q_EMIT SessionSettingsChanged();}
     void keyboardBrightnessChanged(int){changed();}
     void powerChanged(const QString& interface,const QVariantMap& values,const QStringList& invalidated){
         if(interface!="org.freedesktop.UPower.PowerProfiles"||(!values.contains("ActiveProfile")&&!invalidated.contains("ActiveProfile")))return;
         const auto value=values.value("ActiveProfile").toString();
+        desktopProfile=value;powerAvailable=true;
+        if(value.isEmpty()||invalidated.contains("ActiveProfile"))readPower();
+        if(desktopProfile!="power-saver")dimmer.fade(false);
+        Q_EMIT SessionSettingsChanged();
         if(!expectedDesktop.isEmpty()&&value==expectedDesktop)expectedDesktop.clear();
         else {expectedDesktop.clear();syncOrigin="desktop";}
         changed();
     }
 public Q_SLOTS:
+    QVariantMap ReadSessionSettings(){
+        touch();
+        return {{"enabled",idleEnabled},{"timeout",idleTimeout},{"powerSaver",desktopProfile=="power-saver"},
+            {"available",dimmer.available()},{"lightingOwner",QString::fromStdString(settings.contains("lighting_owner")?settings.at("lighting_owner"):"")}};
+    }
+    bool IdleChanged(bool isIdle){
+        if(!calledFromDBus())return false;
+        const auto sender=message().service();
+        // Two notifications per idle cycle. No authorization subprocess, TPM
+        // access, device enumeration or D-Bus traffic on animation ticks.
+        if(!activeUser(sender))return false;
+        if(isIdle&&(!idleEnabled||desktopProfile!="power-saver"))return false;
+        if(!idleOwner.isEmpty()&&idleOwner!=sender)return false;
+        if(!isIdle&&idleOwner.isEmpty())return true;
+        idleOwner=sender;clients.addWatchedService(sender);
+        return dimmer.fade(isIdle);
+    }
     void Subscribe(){if(!calledFromDBus()||subscribers.size()>=16)return;const auto sender=message().service();subscribers.insert(sender);clients.addWatchedService(sender);touch();}
-    void Unsubscribe(){if(!calledFromDBus())return;const auto sender=message().service();subscribers.remove(sender);clients.removeWatchedService(sender);touch();}
+    void Unsubscribe(){if(!calledFromDBus())return;const auto sender=message().service();subscribers.remove(sender);if(sender!=idleOwner)clients.removeWatchedService(sender);touch();}
     QString ReadState(){touch();return cached.isEmpty()?state():cached;}
     QString ReadTelemetry(){touch();return ctlCommand({"telemetry"}).output;}
     QString Diagnose(const QString& topic){
@@ -159,6 +218,7 @@ public Q_SLOTS:
             }
             if(result.ok&&!savedSettings.isEmpty()){QStringList save{"config","set"};save.append(savedSettings);auto saved=ctlCommand(save,true);if(!saved.ok)result={false,"Ayar uygulandı fakat hatırlanamadı: "+saved.output};}
             reloadSync();
+            if(result.ok&&command.value(0)=="config")activateSession();
             if(result.ok&&syncEnabled){
                 if(command.value(0)=="power")syncOrigin="desktop";
                 else if(command.value(0)=="profile")syncOrigin="hardware";
@@ -180,6 +240,7 @@ public Q_SLOTS:
     }
 Q_SIGNALS:
     void StateChanged();
+    void SessionSettingsChanged();
 };
 int main(int argc,char** argv){QCoreApplication app(argc,argv);if(geteuid()!=0)return 3;Service service;auto bus=QDBusConnection::systemBus();if(!bus.registerObject("/org/gamegaraj/Slayer1",&service,QDBusConnection::ExportAllSlots|QDBusConnection::ExportAllSignals)||!bus.registerService("org.gamegaraj.Slayer1"))return 1;return app.exec();}
 #include "main.moc"

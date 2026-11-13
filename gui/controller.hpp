@@ -33,7 +33,6 @@ class Controller:public QObject {
     void drain();
     void telemetry();
     void readPower();
-    void followAccent();
 public:
     Controller(SlayerBackend*,bool fixtureMode,QObject* parent=nullptr);
     bool preview()const{return fixture;}
@@ -58,7 +57,6 @@ public:
     Q_INVOKABLE void clearError(){lastError.clear();Q_EMIT changed();}
 private Q_SLOTS:
     void stateChanged(){if(foreground)refresh();}
-    void powerChanged(const QString&,const QVariantMap&,const QStringList&);
 Q_SIGNALS:
     void changed();
     void metricsChanged();

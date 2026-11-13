@@ -69,8 +69,8 @@ def main():
             self.created_at=time.time()
             if not args.preview:
                 try:
-                    self.was_kameleon=subprocess.check_output(['/usr/bin/qdbus-qt6','org.kde.kded6','/modules/kameleon','org.kde.kameleon.isEnabled'],text=True,timeout=2).strip()=='true'
-                    if self.was_kameleon:subprocess.run(['/usr/bin/qdbus-qt6','org.kde.kded6','/modules/kameleon','org.kde.kameleon.setEnabled','false'],check=True,timeout=2)
+                    self.was_kameleon=subprocess.check_output(['/usr/bin/slayerctl','keyboard','accent','status'],text=True,timeout=2).strip()=='true'
+                    if self.was_kameleon:subprocess.run(['/usr/bin/slayerctl','keyboard','accent','off'],check=True,timeout=2)
                 except (OSError,subprocess.SubprocessError):pass
             layout=QVBoxLayout(self);layout.setContentsMargins(22,22,22,22);layout.setSpacing(16)
             self.title=QLabel();font=self.title.font();font.setPointSizeF(font.pointSizeF()*1.35);font.setBold(True);self.title.setFont(font);layout.addWidget(self.title)
@@ -179,7 +179,7 @@ def main():
             if self.index>0:self.index-=1;self.show_target()
         def restore_accent(self):
             if self.was_kameleon:
-                subprocess.run(['/usr/bin/qdbus-qt6','org.kde.kded6','/modules/kameleon','org.kde.kameleon.setEnabled','true'],timeout=2)
+                subprocess.run(['/usr/bin/slayerctl','keyboard','accent','on'],timeout=2)
                 self.was_kameleon=False
         def worker_finished(self,*_):
             if self.complete:self.status.setText('20 / 20 renk kaydedildi. Renk dönüşümü hesaplanıp uygulanıyor…');self.fit_model()

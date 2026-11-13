@@ -58,13 +58,7 @@ void SlayerBackend::openColorCalibration(){
 void SlayerBackend::openSettings(const QString&module){
     if(m_preview)return;
     if(module!=QStringLiteral("display")&&module!=QStringLiteral("touchpad")&&module!=QStringLiteral("power"))return;
-    if(qEnvironmentVariable("XDG_CURRENT_DESKTOP").contains(QStringLiteral("GNOME"),Qt::CaseInsensitive)){
-        const auto panel=module==u"display"?QStringLiteral("display"):module==u"touchpad"?QStringLiteral("mouse"):QStringLiteral("power");
-        QProcess::startDetached(QStringLiteral("/usr/bin/gnome-control-center"),{panel});
-    }else{
-        const auto panel=module==u"display"?QStringLiteral("kcm_kscreen"):module==u"touchpad"?QStringLiteral("kcm_touchpad"):QStringLiteral("kcm_powerdevilprofilesconfig");
-        QProcess::startDetached(QStringLiteral("/usr/bin/kcmshell6"),{panel});
-    }
+    QProcess::startDetached(QStringLiteral(SLAYER_CLI),{QStringLiteral("desktop"),QStringLiteral("settings"),module});
 }
 void SlayerBackend::refresh(){if(m_busy)return;m_mutating=false;start(QStringLiteral(SLAYER_CLI),{QStringLiteral("ui-data")},true);}
 void SlayerBackend::run(const QStringList&args,bool privileged){

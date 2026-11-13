@@ -1,5 +1,5 @@
 Name:           slayerctl
-Version:        0.1.0
+Version:        0.1.1
 Release:        1%{?dist}
 Summary:        Game Garaj Slayer hardware control backend
 License:        MIT
@@ -9,8 +9,9 @@ Packager:       MCC45TR <mcc45tr@gmail.com>
 BuildRequires:  gcc-c++, cmake, make, ninja-build, python3-devel
 BuildRequires:  qt6-qtbase-devel, qt6-qtdeclarative-devel, extra-cmake-modules
 BuildRequires:  kf6-kcmutils-devel, pkgconfig(xkbcommon), pkgconfig(wayland-client)
+BuildRequires:  pkgconfig(libsystemd), pkgconfig(x11), pkgconfig(xext), wayland-devel
 BuildRequires:  systemd-rpm-macros, desktop-file-utils, breeze-icon-theme
-BuildRequires:  /usr/share/wallpapers/Default, xkeyboard-config
+BuildRequires:  desktop-backgrounds-kde, xkeyboard-config
 Requires:       polkit, systemd, systemd-udev, /usr/bin/systemd-creds
 %{?systemd_requires}
 %global debug_package %{nil}
@@ -101,6 +102,10 @@ desktop-file-validate %{buildroot}%{_datadir}/applications/slayer-control-gtk.de
 %{_libexecdir}/slayerctl-helper
 %{_libexecdir}/slayerctl-desktop
 %{_libexecdir}/slayerctl-service
+%{_libexecdir}/slayerctl-session
+%{_userunitdir}/slayerctl-session.service
+%{_datadir}/dbus-1/services/org.gamegaraj.Slayer.Session1.service
+%{_sysconfdir}/xdg/autostart/slayerctl-session.desktop
 %{_datadir}/dbus-1/system.d/org.gamegaraj.Slayer1.conf
 %{_datadir}/dbus-1/system-services/org.gamegaraj.Slayer1.service
 %{_datadir}/polkit-1/rules.d/49-slayerctl-admin.rules
@@ -134,3 +139,8 @@ desktop-file-validate %{buildroot}%{_datadir}/applications/slayer-control-gtk.de
 %{_bindir}/slayer-control-gtk
 %{_datadir}/metainfo/io.github.MCC45TR.slayer_control_gtk.metainfo.xml
 %{_datadir}/applications/slayer-control-gtk.desktop
+
+%changelog
+* Sat Nov 14 2026 MCC45TR <mcc45tr@gmail.com> - 0.1.1-1
+- Independent ctl desktop integration and quiet five-second keyboard idle fades.
+- COPR distribution, native Qt frontend, face utility and GNOME placeholder.

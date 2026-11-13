@@ -10,7 +10,6 @@
 namespace {
 constexpr auto service="org.gamegaraj.Slayer1";
 constexpr auto path="/org/gamegaraj/Slayer1";
-constexpr auto powerService="org.freedesktop.UPower.PowerProfiles";
 QDBusMessage call(const QString& method){return QDBusMessage::createMethodCall(service,path,service,method);}
 }
 Controller::Controller(SlayerBackend* backend,bool fixtureMode,QObject* parent):QObject(parent),device(backend),fixture(fixtureMode){
@@ -18,10 +17,8 @@ Controller::Controller(SlayerBackend* backend,bool fixtureMode,QObject* parent):
     timer.setInterval(3000);connect(&timer,&QTimer::timeout,this,&Controller::telemetry);
     if(!fixture){
         QDBusConnection::systemBus().connect(service,path,service,"StateChanged",this,SLOT(stateChanged()));
-        QDBusConnection::systemBus().connect(powerService,"/org/freedesktop/UPower/PowerProfiles","org.freedesktop.DBus.Properties","PropertiesChanged",this,SLOT(powerChanged(QString,QVariantMap,QStringList)));
 
     }
-    connect(device,&SlayerBackend::dataChanged,this,&Controller::followAccent);
     QTimer::singleShot(0,this,&Controller::refresh);
 }
 void Controller::setActive(bool value){
@@ -35,7 +32,7 @@ void Controller::setReducedMotion(bool value){reduce=value;if(!fixture)QSettings
 void Controller::refresh(){
     if(fixture){values={{"cpu_usage",23},{"gpu_usage",12},{"cpu_fan",1850},{"gpu_fan",1720},{"cpu_temp",48},{"gpu_temp",43}};power="balanced";ppChoices={"power-saver","balanced","performance"};ppAvailable=true;Q_EMIT metricsChanged();Q_EMIT changed();return;}
     auto* watcher=new QDBusPendingCallWatcher(QDBusConnection::systemBus().asyncCall(call("ReadState"),20000),this);
-    connect(watcher,&QDBusPendingCallWatcher::finished,this,[this,watcher]{QDBusPendingReply<QString> reply=*watcher;watcher->deleteLater();if(reply.isError()){lastError=tr("Cihaz servisine ulaşılamadı: %1").arg(reply.error().message());device->acceptData({});}else{device->acceptData(reply.value());const auto problem=device->info().value("config_error").toString();if(!problem.isEmpty())lastError=problem;}Q_EMIT changed();});readPower();
+    connect(watcher,&QDBusPendingCallWatcher::finished,this,[this,watcher]{QDBusPendingReply<QString> reply=*watcher;watcher->deleteLater();if(reply.isError()){lastError=tr("Cihaz servisine ulaşılamadı: %1").arg(reply.error().message());device->acceptData({});}else{device->acceptData(reply.value());readPower();const auto problem=device->info().value("config_error").toString();if(!problem.isEmpty())lastError=problem;}Q_EMIT changed();});
 }
 void Controller::apply(const QStringList& command,const QStringList& remember){
     if(command.isEmpty())return;
@@ -79,35 +76,15 @@ void Controller::diagnose(const QString& topic){
     connect(watcher,&QDBusPendingCallWatcher::finished,this,[this,watcher]{QDBusPendingReply<QString> reply=*watcher;watcher->deleteLater();diagnostic=reply.isError()?reply.error().message():reply.value();Q_EMIT changed();});
 }
 void Controller::readPower(){
-    if(fixture)return;
-    auto msg=QDBusMessage::createMethodCall(powerService,"/org/freedesktop/UPower/PowerProfiles","org.freedesktop.DBus.Properties","GetAll");msg<<powerService;
-    auto* watcher=new QDBusPendingCallWatcher(QDBusConnection::systemBus().asyncCall(msg),this);
-    connect(watcher,&QDBusPendingCallWatcher::finished,this,[this,watcher]{QDBusPendingReply<QVariantMap> reply=*watcher;watcher->deleteLater();ppAvailable=!reply.isError();if(ppAvailable){power=reply.value().value("ActiveProfile").toString();ppChoices.clear();const auto array=qvariant_cast<QDBusArgument>(reply.value().value("Profiles"));array.beginArray();while(!array.atEnd()){QVariantMap item;array>>item;ppChoices.append(item.value("Profile").toString());}array.endArray();}Q_EMIT changed();});
+    const auto info=device->info();power=info.value("desktop_profile").toString();
+    ppAvailable=info.value("desktop_available").toString()=="1";
+    ppChoices=info.value("desktop_choices").toString().split(u' ',Qt::SkipEmptyParts);
 }
-void Controller::powerChanged(const QString&,const QVariantMap&,const QStringList&){readPower();}
 void Controller::setPower(const QString& value){
     if(fixture||!ppChoices.contains(value))return;
     apply({"power","set",value},{"desktop_profile",value});
 }
-void Controller::followAccent(){
-    if(fixture)return;
-    const auto owner=device->info().value("saved_lighting_owner").toString();
-    if(owner!="custom"&&owner!="accent")return;
-    auto get=QDBusMessage::createMethodCall("org.kde.kded6","/modules/kameleon","org.kde.kameleon","isEnabled");
-    auto* watcher=new QDBusPendingCallWatcher(QDBusConnection::sessionBus().asyncCall(get),this);
-    connect(watcher,&QDBusPendingCallWatcher::finished,this,[this,watcher,owner]{
-        QDBusPendingReply<bool> reply=*watcher;watcher->deleteLater();
-        if(reply.isError()){if(owner=="accent"){lastError=tr("KDE vurgu rengi servisine ulaşılamadı.");Q_EMIT changed();}return;}
-        const bool wanted=owner=="accent";if(reply.value()==wanted)return;
-        auto set=QDBusMessage::createMethodCall("org.kde.kded6","/modules/kameleon","org.kde.kameleon","setEnabled");set<<wanted;
-        auto* change=new QDBusPendingCallWatcher(QDBusConnection::sessionBus().asyncCall(set),this);
-        connect(change,&QDBusPendingCallWatcher::finished,this,[this,change]{QDBusPendingReply<> result=*change;change->deleteLater();if(result.isError()){lastError=tr("KDE renk yönetimi değiştirilemedi: %1").arg(result.error().message());Q_EMIT changed();}});
-    });
-}
-
 void Controller::reboot(){
     if(fixture){lastError=tr("Önizlemede yeniden başlatma kapalıdır.");Q_EMIT changed();return;}
-    auto msg=QDBusMessage::createMethodCall("org.freedesktop.login1","/org/freedesktop/login1","org.freedesktop.login1.Manager","Reboot");msg<<true;
-    auto* watcher=new QDBusPendingCallWatcher(QDBusConnection::systemBus().asyncCall(msg),this);
-    connect(watcher,&QDBusPendingCallWatcher::finished,this,[this,watcher]{QDBusPendingReply<> reply=*watcher;watcher->deleteLater();if(reply.isError()){lastError=reply.error().message();Q_EMIT changed();}});
+    device->run({"desktop","reboot"},false);
 }
