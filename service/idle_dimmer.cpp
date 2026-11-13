@@ -7,6 +7,7 @@
 #include <cmath>
 #include <fcntl.h>
 #include <unistd.h>
+#include <utility>
 
 static QString scalePath() {
     // No client-supplied paths, USB reports, or EC register access.

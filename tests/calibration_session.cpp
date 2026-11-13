@@ -85,6 +85,15 @@ int main(int argc,char** argv){
         }
         QDBusConnection::disconnectFromBus("calibration-b");
         require(until([&]{const auto state=status(bus);return !state.value("calibrating").toBool()&&state.value("armed").toBool();}),"Disconnected tool did not release/rearm idle watch");
+        {
+            auto early=QDBusConnection::connectToBus(QDBusConnection::SessionBus,"calibration-early-exit");
+            auto abandoned=send(early,"BeginCalibration");
+            require(until([&]{return core.preparations==2;}),"Early-exit tool preparation");
+            require(!abandoned.isFinished(),"Early-exit measurement prematurely ready");
+        }
+        QDBusConnection::disconnectFromBus("calibration-early-exit");
+        require(until([&]{return !status(bus).value("calibrating").toBool();}),"Disconnected preparation retained its lease");
+        core.finish();
         core.reject=true;
         auto rejected=send(a,"BeginCalibration");require(until([&]{return rejected.isFinished();}),"Rejected brightness barrier reply");
         QDBusPendingReply<bool> failure=rejected;require(failure.isError(),"Failed hardware preparation incorrectly succeeded");

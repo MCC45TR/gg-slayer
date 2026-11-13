@@ -50,4 +50,5 @@ class CalibrationSession(QObject):
         self.closed = True
         if self.requested:
             message = QDBusMessage.createMethodCall(SERVICE, PATH, SERVICE, 'EndCalibration')
+            message.setAutoStartService(False)
             QDBusConnection.sessionBus().asyncCall(message, 2000)

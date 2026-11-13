@@ -2,6 +2,7 @@
 #include "idle_watch.hpp"
 #include <QCoreApplication>
 #include <QDBusConnection>
+#include <QDBusConnectionInterface>
 #include <QDBusContext>
 #include <QDBusInterface>
 #include <QDBusPendingCallWatcher>
@@ -83,6 +84,10 @@ public Q_SLOTS:
         }
         if(calibrations.size()>=8){sendErrorReply("org.gamegaraj.Slayer.Session1.Busy",tr("Çok fazla kalibrasyon aracı açık."));return false;}
         calibrations.insert(sender);calibrationClients.addWatchedService(sender);exitTimer.stop();
+        // Subscribe before querying: a caller may vanish while its activation
+        // request is queued. Do not retain an already dead unique bus name.
+        const auto alive=QDBusConnection::sessionBus().interface()->isServiceRegistered(sender);
+        if(!alive.isValid()||!alive.value()){releaseCalibration(sender,false);return false;}
         if(calibrationPrepared)return true;
         const auto request=message();setDelayedReply(true);calibrationReplies.insert(sender,request);
         if(calibrations.size()==1){
