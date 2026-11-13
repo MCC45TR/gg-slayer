@@ -30,6 +30,8 @@ Kirigami.ApplicationWindow {
         onModalChanged: Qt.callLater(function() { drawerOpen = !modal })
         drawerOpen: !modal
         handleVisible: modal
+        handleClosedToolTip: qsTr("Bölümleri aç")
+        handleOpenToolTip: qsTr("Bölümleri kapat")
         actions: [
             Kirigami.Action { text: root.destinations[0]; icon.name: root.icons[0]; checked: root.section === 0; onTriggered: root.section = 0 },
             Kirigami.Action { text: root.destinations[1]; icon.name: root.icons[1]; checked: root.section === 1; onTriggered: root.section = 1 },

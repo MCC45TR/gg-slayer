@@ -6,7 +6,8 @@
     "Description": "Game Garaj Slayer için durum ve güvenli donanım kontrolleri",
     "Icon": "computer-laptop",
     "Version": "@PROJECT_VERSION@",
-    "License": "MIT"
+    "License": "MIT",
+    "Authors": [{"Name": "MCC45TR", "Email": "mcc45tr@gmail.com"}]
   },
   "X-KDE-System-Settings-Parent-Category": "hardware",
   "X-KDE-Keywords": "Slayer,Game Garaj,BIOS,RGB,keyboard,klavye,fan,battery,pil,MUX,USB",

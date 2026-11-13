@@ -15,6 +15,7 @@
 int main(int argc,char** argv){
     if(qEnvironmentVariableIsEmpty("QT_QUICK_CONTROLS_STYLE"))QQuickStyle::setStyle("org.kde.desktop");
     QApplication app(argc,argv);app.setOrganizationName("GameGaraj");app.setApplicationName("Slayer Control");
+    app.setDesktopFileName("slayer-control");app.setWindowIcon(QIcon::fromTheme("computer-laptop"));
     const bool fixture=app.arguments().contains("--fixture");
     SlayerBackend device(nullptr,false);Controller control(&device,fixture);
     const auto fixtureText=QString::fromUtf8([]{QFile f(QStringLiteral(SLAYER_FIXTURE_DATA));if(!f.open(QIODevice::ReadOnly))return QByteArray{};return f.readAll()+QByteArray("\nvalue\tsaved_lighting_owner\tcustom\nvalue\tsaved_brightness_owner\tcustom\nvalue\tbattery_cycles\t132\n");}());
