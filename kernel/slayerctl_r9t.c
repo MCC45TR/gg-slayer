@@ -22,6 +22,7 @@
 #include "thermal_profile.h"
 #include "model_contract.h"
 #include "mux_transaction.h"
+#define R9T_DRIVER_VERSION "0.1.1"
 
 static acpi_handle ec;
 static struct platform_device *pdev;
@@ -353,7 +354,7 @@ static ssize_t charging_profiles_available_show(struct device *dev, struct devic
 { return sysfs_emit(buf, "high-capacity balanced stationary\n"); }
 static DEVICE_ATTR_RO(charging_profiles_available);
 static ssize_t backend_version_show(struct device *dev, struct device_attribute *attr, char *buf)
-{ return sysfs_emit(buf, "0.1.0 R9T-IDK26-N.1.46GAR16\n"); }
+{ return sysfs_emit(buf, R9T_DRIVER_VERSION " R9T-IDK26-N.1.46GAR16\n"); }
 static DEVICE_ATTR_RO(backend_version);
 static struct attribute *attrs[] = { &dev_attr_profile_event_count.attr, &dev_attr_thermal_mode.attr, &dev_attr_thermal_mode_choices.attr, &dev_attr_profile_events.attr, &dev_attr_thermal_control.attr, &dev_attr_backend_version.attr, &dev_attr_charging_profile.attr,
 	&dev_attr_charging_profiles_available.attr, &dev_attr_fn_lock.attr,
@@ -550,5 +551,5 @@ module_init(r9t_init);
 module_exit(r9t_exit);
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("Exact-model Game Garaj R9T controls and hwmon");
-MODULE_VERSION("0.1.1");
+MODULE_VERSION(R9T_DRIVER_VERSION);
 MODULE_IMPORT_NS("EFIVAR");
