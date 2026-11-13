@@ -217,7 +217,8 @@ void configuration(const Io&io,const std::vector<std::string>&a){
     if(!io.fixture()){
         bool sessionChanged=false;
         for(const auto& key:{"keyboard_idle_dim","keyboard_idle_timeout","lighting_owner","performance_sync"}){
-            const auto before=previous.find(key),after=cfg.cfind(key);
+            const auto before=previous.find(key);
+            const auto after=cfg.find(key);
             if((before==previous.end())!=(after==cfg.end())||(before!=previous.end()&&after!=cfg.end()&&before->second!=after->second))sessionChanged=true;
         }
         if(sessionChanged)capture({"/usr/bin/systemctl","--no-block","start","slayerctl-control.service"},5000);

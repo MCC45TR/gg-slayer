@@ -89,6 +89,8 @@ Diğer:
   slayerctl kde                     KDE Sistem Ayarları modülünü aç
   slayerctl power status            KDE/GNOME ortak güç profili
   slayerctl power set balanced      Mevcut masaüstü servisine profil isteği
+  slayerctl idle on|off|status       Güç tasarrufunda sessiz klavye geçişi
+  slayerctl idle timeout 30         Bekleme: 5,10,15,30,60,120,180,300,600,900,1200,1800 sn
   slayerctl service status          systemd açılış/uyanma hizmetleri
   sudo systemctl enable --now slayerctl.service slayerctl-resume.service
   slayerctl --dry-run KOMUT         Yazmadan önizleme
