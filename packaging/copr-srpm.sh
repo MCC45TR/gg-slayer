@@ -11,6 +11,13 @@ mkdir -p "$work"/{SOURCES,SPECS,SRPMS} "$output"
 if ! command -v rpmbuild >/dev/null; then dnf -y install rpm-build; fi
 if ! command -v git >/dev/null; then dnf -y install git-core; fi
 cp "$root/packaging/rpm/SPECS/$spec_name" "$work/SPECS/"
+if test "$spec_name" != slayerctl.spec; then
+ # A stable per-source-build release survives mock's two spec parses. Kernel
+ # ABI discovery may change subpackage names after build dependencies install.
+ # Rebuilding for a new ABI must also make the meta-package upgrade in DNF.
+ build_epoch=$(date -u +%Y%m%d%H%M%S)
+ sed -i "s/^%global copr_build 0$/%global copr_build $build_epoch/" "$work/SPECS/$spec_name"
+fi
 case "$spec_name" in
  slayerctl.spec)
   version=$(cat "$root/VERSION")

@@ -22,3 +22,20 @@ a user during installation.
 The COPR SCM packages use `.copr/Makefile` and `packaging/copr-srpm.sh` to generate
 source RPMs on the server. Compilation and all fixture/render checks run in
 COPR. No locally compiled application RPMs are uploaded.
+
+
+Kernel modules are prebuilt for the latest kernel-devel in each target chroot.
+Their RPM names and dependencies include the exact kernel ABI. DNF never runs
+akmods. A new kernel ABI needs a new COPR module build; use `build-package` above
+(or the GitHub manual build workflow), then DNF upgrade. Previously installed
+kernel-specific packages remain available for their matching kernels.
+
+Secure Boot is not disabled. At install, the upstream Linux sign-file utility
+(compiled on COPR) can sign the downloaded modules with an existing root-only
+akmods MOK key. This machine already has that key enrolled. No key is created or
+enrolled automatically. On another machine without an enrolled key, Secure Boot
+module loading requires the administrator's normal signing/enrollment setup.
+
+Source pushes rebuild all three SCM packages through the GitHub webhook. Its
+trigger credential is scoped to this COPR project and is not a COPR account API
+token. Personal calibration and machine configuration never enter Git archives.

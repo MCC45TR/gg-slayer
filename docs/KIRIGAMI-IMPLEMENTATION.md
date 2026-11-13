@@ -1,3 +1,8 @@
+> Güncel dağıtım: [COPR](COPR.md). Aşağıdaki yerel derleme/kurulum
+> kayıtları geçmiş doğrulama notlarıdır. Yeni paketler yalnız COPR üzerinde
+> derlenir; kurulum ve güncelleme DNF ile yapılır. Eski build/install betikleri
+> COPR/DNF girişlerine yönlendirilmiştir.
+
 # Kirigami uygulaması
 
 Bağımsız `slayer-control` artık Qt Quick/Kirigami kullanır. Yedi bölüm, genişliğe

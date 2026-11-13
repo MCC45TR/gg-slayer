@@ -12,6 +12,11 @@ import xml.etree.ElementTree as ET
 root = Path(sys.argv[1])
 required = (
     '/usr/libexec/slayerctl-service', '/usr/libexec/slayerctl-desktop',
+    '/usr/libexec/slayerctl-session', '/usr/libexec/slayerctl-module-sign',
+    '/usr/libexec/slayerctl-kmod-activate',
+    '/usr/lib/systemd/user/slayerctl-session.service',
+    '/usr/share/dbus-1/services/org.gamegaraj.Slayer.Session1.service',
+    '/etc/xdg/autostart/slayerctl-session.desktop',
     '/usr/share/dbus-1/system.d/org.gamegaraj.Slayer1.conf',
     '/usr/share/dbus-1/system-services/org.gamegaraj.Slayer1.service',
     '/usr/share/polkit-1/rules.d/49-slayerctl-admin.rules',

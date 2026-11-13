@@ -1,0 +1,34 @@
+name: Rebuild packages on COPR
+on:
+  workflow_dispatch:
+    inputs:
+      package:
+        description: Package to rebuild (kernel ABI updates build on COPR)
+        required: true
+        type: choice
+        options:
+          - kernels
+          - all
+          - slayerctl
+permissions: {}
+jobs:
+  copr:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Request remote builds
+        env:
+          HOOK_BASE: ${{ secrets.COPR_BUILD_WEBHOOK_BASE }}
+          PACKAGE_SET: ${{ inputs.package }}
+        run: |
+          set -euo pipefail
+          case "$PACKAGE_SET" in
+            kernels) packages='slayerctl-r9t-kmod ite8291r3-kmod' ;;
+            all) packages='slayerctl slayerctl-r9t-kmod ite8291r3-kmod' ;;
+            slayerctl) packages='slayerctl' ;;
+            *) exit 2 ;;
+          esac
+          for package in $packages; do
+            curl --fail --silent --show-error --output /dev/null --request POST "${HOOK_BASE}${package}/"
+            echo "COPR build requested: $package"
+          done

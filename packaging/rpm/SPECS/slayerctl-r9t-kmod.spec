@@ -3,10 +3,10 @@
 %global debug_package %{nil}
 %undefine _auto_set_build_flags
 %global kver %(v=$(rpm -q --qf '%%{VERSION}-%%{RELEASE}.%%{ARCH}\\n' kernel-devel 2>/dev/null); if test $? -eq 0; then echo "$v" | sort -V | tail -n1; else echo 0; fi)
-%global krel %(echo %{kver} | tr '-' '_')
+%global copr_build 0
 Name: slayerctl-r9t-kmod
 Version: 0.1.1
-Release: 1.%{krel}%{?dist}
+Release: 1.%{copr_build}%{?dist}
 Summary: Exact-model Slayer R9T controls and hwmon bridge
 License: GPL-2.0-only
 URL: https://github.com/MCC45TR/gg-slayer
@@ -19,6 +19,8 @@ Requires: kmod-slayerctl-r9t-%{kver} = %{version}-%{release}
 Provides: slayerctl-r9t-kmod-common = %{version}-%{release}
 Obsoletes: slayerctl-r9t-kmod-common < %{version}-%{release}
 Obsoletes: akmod-slayerctl-r9t < %{version}-%{release}
+Provides: kmod-slayerctl-r9t = %{version}-%{release}
+Obsoletes: kmod-slayerctl-r9t < %{version}-%{release}
 %description
 Prebuilt Exact-model Slayer R9T controls and hwmon bridge. All compilation occurs on COPR; no akmods or local build
 runs on installation. The kernel-specific payload remains available for its ABI.

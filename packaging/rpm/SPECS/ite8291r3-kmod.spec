@@ -3,10 +3,10 @@
 %global debug_package %{nil}
 %undefine _auto_set_build_flags
 %global kver %(v=$(rpm -q --qf '%%{VERSION}-%%{RELEASE}.%%{ARCH}\\n' kernel-devel 2>/dev/null); if test $? -eq 0; then echo "$v" | sort -V | tail -n1; else echo 0; fi)
-%global krel %(echo %{kver} | tr '-' '_')
+%global copr_build 0
 Name: ite8291r3-kmod
 Version: 0.0.20261114.1
-Release: 1.%{krel}%{?dist}
+Release: 1.%{copr_build}%{?dist}
 Summary: Native ITE keyboard LED driver with quiet idle brightness
 License: GPL-2.0-or-later
 URL: https://github.com/MCC45TR/gg-slayer
@@ -19,6 +19,8 @@ Requires: kmod-ite8291r3-%{kver} = %{version}-%{release}
 Provides: ite8291r3-kmod-common = %{version}-%{release}
 Obsoletes: ite8291r3-kmod-common < %{version}-%{release}
 Obsoletes: akmod-ite8291r3 < %{version}-%{release}
+Provides: kmod-ite8291r3 = %{version}-%{release}
+Obsoletes: kmod-ite8291r3 < %{version}-%{release}
 %description
 Prebuilt Native ITE keyboard LED driver with quiet idle brightness. All compilation occurs on COPR; no akmods or local build
 runs on installation. The kernel-specific payload remains available for its ABI.
