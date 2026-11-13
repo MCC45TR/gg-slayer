@@ -1,6 +1,6 @@
 Name:           slayerctl
-Version:        0.1.1
-Release:        8%{?dist}
+Version:        0.1.2
+Release:        1%{?dist}
 Summary:        Game Garaj Slayer hardware control backend
 License:        MIT AND LGPL-2.1-or-later
 URL:            https://github.com/MCC45TR/gg-slayer
@@ -14,6 +14,7 @@ BuildRequires:  pkgconfig(libsystemd), pkgconfig(x11), pkgconfig(xext), wayland-
 BuildRequires:  systemd-rpm-macros, desktop-file-utils, breeze-icon-theme
 BuildRequires:  kf6-kirigami, kf6-qqc2-desktop-style, qt6-qtimageformats
 BuildRequires:  desktop-backgrounds-kde, xkeyboard-config
+BuildRequires:  dbus-daemon
 Requires:       polkit, systemd, systemd-udev, /usr/bin/systemd-creds
 Recommends:     slayerctl-r9t-kmod, ite8291r3-kmod
 %{?systemd_requires}
@@ -149,6 +150,9 @@ desktop-file-validate %{buildroot}%{_datadir}/applications/slayer-control-gtk.de
 %{_datadir}/applications/slayer-control-gtk.desktop
 
 %changelog
+* Sat Nov 14 2026 MCC45TR <mcc45tr@gmail.com> - 0.1.2-1
+- Keep calibration brightness constant with ctl-owned, disconnect-safe leases.
+- Wait for the actual brightness restore before starting a measurement worker.
 * Sat Nov 14 2026 MCC45TR <mcc45tr@gmail.com> - 0.1.1-1
 - Independent ctl desktop integration and quiet five-second keyboard idle fades.
 - COPR distribution, native Qt frontend, face utility and GNOME placeholder.

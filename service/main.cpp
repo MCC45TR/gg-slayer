@@ -138,7 +138,7 @@ public:
         QDBusConnection::systemBus().connect("org.freedesktop.login1","/org/freedesktop/login1","org.freedesktop.login1.Manager","PrepareForSleep",this,SLOT(prepareForSleep(bool)));
         QTimer::singleShot(0,this,[this]{readPower();reloadSync();reconcile();activateSession();});
     }
-    ~Service()override{if(socketFd>=0)close(socketFd);}
+    ~Service()override{dimmer.reset();if(socketFd>=0)close(socketFd);}
 private Q_SLOTS:
     void seatChanged(const QString&,const QVariantMap& values,const QStringList&){if(values.contains("ActiveSession")&&!idleOwner.isEmpty()&&!activeUser(idleOwner))releaseIdle();}
     void prepareForSleep(bool sleeping){asleep=sleeping;if(sleeping)releaseIdle();Q_EMIT SessionSettingsChanged();}
@@ -171,6 +171,19 @@ public Q_SLOTS:
         if(!isIdle&&idleOwner.isEmpty())return true;
         idleOwner=sender;clients.addWatchedService(sender);
         return dimmer.fade(isIdle);
+    }
+    bool PrepareCalibration(){
+        if(!calledFromDBus())return false;
+        const auto sender=message().service();
+        if(!activeUser(sender)||(!idleOwner.isEmpty()&&idleOwner!=sender))return false;
+        // Older drivers have no transient scale and need no fade barrier.
+        if(!dimmer.available())return true;
+        idleOwner=sender;clients.addWatchedService(sender);
+        const auto request=message();setDelayedReply(true);
+        dimmer.restore([this,request](bool ok){
+            QDBusConnection::systemBus().send(request.createReply(QVariantList{ok&&activeUser(request.service())}));
+        });
+        return false;
     }
     void Subscribe(){if(!calledFromDBus()||subscribers.size()>=16)return;const auto sender=message().service();subscribers.insert(sender);clients.addWatchedService(sender);touch();}
     void Unsubscribe(){if(!calledFromDBus())return;const auto sender=message().service();subscribers.remove(sender);if(sender!=idleOwner)clients.removeWatchedService(sender);touch();}

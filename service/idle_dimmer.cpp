@@ -26,8 +26,9 @@ IdleDimmer::IdleDimmer(QObject* parent):QObject(parent) {
         const auto ms=elapsed.elapsed();
         const int next=slayer::idleScaleAt(from,target,ms);
         if(!writeScale(next)){reset();return;}
-        if(ms>=slayer::idleFadeMilliseconds){timer.stop();if(target==1000&&fd>=0){close(fd);fd=-1;}}
+        if(ms>=slayer::idleFadeMilliseconds){timer.stop();if(target==1000){if(fd>=0){close(fd);fd=-1;}complete(true);}}
     });
+    reset();
 }
 IdleDimmer::~IdleDimmer(){reset();}
 bool IdleDimmer::available() const{return !scalePath().isEmpty();}
@@ -39,13 +40,24 @@ bool IdleDimmer::writeScale(int value){
     current=value;return true;
 }
 bool IdleDimmer::fade(bool dim){
+    if(dim)complete(false);
     const int next=dim?1:1000;
     if(next==target&&(timer.isActive()||current==next))return true;
     if(!writeScale(current))return false;
     from=current;target=next;elapsed.start();timer.start();return true;
 }
+void IdleDimmer::complete(bool ok){auto callbacks=std::move(restored);restored.clear();for(auto& ready:callbacks)ready(ok);}
+void IdleDimmer::restore(std::function<void(bool)> ready){
+    if(restored.size()>=8||!fade(false)){ready(false);return;}
+    if(!timer.isActive()){
+        const bool ok=writeScale(1000);if(fd>=0){close(fd);fd=-1;}
+        ready(ok);return;
+    }
+    restored.push_back(std::move(ready));
+}
 void IdleDimmer::reset(){
     timer.stop();writeScale(1000);
     if(fd>=0)close(fd);
     fd=-1;current=from=target=1000;
+    complete(false);
 }

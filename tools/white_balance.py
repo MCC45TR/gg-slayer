@@ -158,9 +158,18 @@ def gui():
             self.worker.readyReadStandardOutput.connect(self.output)
             self.worker.readyReadStandardError.connect(self.error_output)
             self.worker.finished.connect(self.finished)
-            self.worker.errorOccurred.connect(lambda _:self.status.setText('Işık yardımcısı başlatılamadı.'))
-            self.worker.start()
+            self.worker.errorOccurred.connect(lambda _:self.calibration_failed('Işık yardımcısı başlatılamadı.'))
+            from calibration_session import CalibrationSession
+            self.calibration_session=CalibrationSession(self)
+            self.status.setText('Sabit kalibrasyon parlaklığı hazırlanıyor…')
+            self.calibration_session.begin(self.worker.start,self.calibration_failed)
 
+        def calibration_failed(self,message):
+            self.ready=False;self.applied=None;self.confirm.setEnabled(False)
+            self.calibration_session.close()
+            if self.worker.state()!=QProcess.ProcessState.NotRunning:
+                self.send({'restore':True});self.worker.closeWriteChannel()
+            self.status.setText(message)
         def rgb(self): return [s.value() for s in self.sliders]
         def changed(self,*_):
             self.pending=self.rgb();self.values.setText('R %d · G %d · B %d'%tuple(self.pending));self.confirm.setEnabled(False)
@@ -212,11 +221,13 @@ def gui():
             if self.applied==self.rgb() and self.ready and not self.busy:
                 self.confirm.setEnabled(False);self.send({'commit':self.rgb()})
         def finished(self,*_):
+            self.calibration_session.close()
             if not self.confirmed:self.status.setText('Yardımcı kapandı. Kalibrasyon kaydedilmedi; önceki ışık geri yüklendi.')
         def closeEvent(self,event:QCloseEvent):
             if not self.confirmed and self.worker.state()!=QProcess.ProcessState.NotRunning:
                 self.send({'restore':True});self.worker.closeWriteChannel()
                 if not self.worker.waitForFinished(3000):event.ignore();return
+            self.calibration_session.close()
             self.restore_accent()
             event.accept()
     window=Window();window.show();window.raise_();window.activateWindow()

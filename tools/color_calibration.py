@@ -65,6 +65,7 @@ def main():
             self.index=next((i for i,r in enumerate(records) if r is None),0)
             self.records=records;self.complete=False;self.ready=args.preview;self.busy=False
             self.applied=None;self.pending=None;self.buffer=b'';self.worker=None
+            self.calibration_session=None
             self.was_kameleon=False;self.sliders=[];self.spins=[]
             self.created_at=time.time()
             if not args.preview:
@@ -104,11 +105,21 @@ def main():
                 self.worker.setArguments(['/usr/bin/python3',str(Path(__file__).with_name('white_balance.py').resolve()),'--backend'])
                 self.worker.readyReadStandardOutput.connect(self.read_output)
                 self.worker.readyReadStandardError.connect(self.read_error)
-                self.worker.errorOccurred.connect(lambda _:self.status.setText('Işık yardımcısı başlatılamadı.'))
-                self.worker.finished.connect(self.worker_finished);self.worker.start()
+                self.worker.errorOccurred.connect(lambda _:self.calibration_failed('Işık yardımcısı başlatılamadı.'))
+                self.worker.finished.connect(self.worker_finished)
+                from calibration_session import CalibrationSession
+                self.calibration_session=CalibrationSession(self)
+                self.status.setText('Sabit kalibrasyon parlaklığı hazırlanıyor…')
+                self.calibration_session.begin(self.worker.start,self.calibration_failed)
             self.write_data()
 
         def rgb(self):return [s.value() for s in self.sliders]
+        def calibration_failed(self,message):
+            self.ready=False;self.applied=None;self.next.setEnabled(False)
+            if self.calibration_session:self.calibration_session.close()
+            if self.worker and self.worker.state()!=QProcess.ProcessState.NotRunning:
+                self.send({'restore':True});self.worker.closeWriteChannel()
+            self.status.setText(message)
         def show_target(self):
             name,target=TARGETS[self.index]
             self.title.setText(f'{self.index+1} / {len(TARGETS)} · {name}')
@@ -182,6 +193,7 @@ def main():
                 subprocess.run(['/usr/bin/slayerctl','keyboard','accent','on'],timeout=2)
                 self.was_kameleon=False
         def worker_finished(self,*_):
+            if self.calibration_session:self.calibration_session.close()
             if self.complete:self.status.setText('20 / 20 renk kaydedildi. Renk dönüşümü hesaplanıp uygulanıyor…');self.fit_model()
             elif not args.preview:self.status.setText('Işık yardımcısı kapandı. Kaydedilen ölçümler korunuyor; aracı tekrar açınca devam edebilirsin.')
         def fit_model(self):
@@ -203,6 +215,7 @@ def main():
             if self.worker and self.worker.state()!=QProcess.ProcessState.NotRunning:
                 self.send({'restore':True});self.worker.closeWriteChannel()
                 if not self.worker.waitForFinished(3000):event.ignore();return
+            if self.calibration_session:self.calibration_session.close()
             self.restore_accent();event.accept()
 
     window=Window();window.show();window.raise_();window.activateWindow()

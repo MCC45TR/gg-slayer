@@ -36,3 +36,9 @@ kapanırsa, etkin kullanıcı değişirse, sistem uykuya girerse veya broker
 sonlanırsa ölçek sıfırlanır. Güç tasarrufundan çıkış ve özelliği kapatma normal
 beş saniyelik geri dönüşü kullanır. Kullanıcı oturum hizmeti donanım dosyalarına
 doğrudan yazmaz; bütün geçişleri sistem brokeri yürütür.
+
+Kalibrasyon araçları ctl oturum köprüsünden geçici bir kalibrasyon hakkı alır.
+Bekleme takibi durdurulur; sistem brokeri seçili seviyeye dönüşü gerçekten
+tamamlamadan ölçüm yardımcısı başlamaz. Pencere kapatılırsa, araç çökerse veya
+hazırlık başarısız olursa hak otomatik bırakılır ve bekleme takibi yeniden
+başlar. Kalibrasyon arayüzü DE etkinliğini kendi başına sorgulamaz.
