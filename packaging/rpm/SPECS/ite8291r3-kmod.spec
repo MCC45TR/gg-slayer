@@ -1,45 +1,56 @@
-%global buildforkernels akmod
+# SPDX-License-Identifier: MIT
+# Headers and compilation stay on COPR. Each binary module names its exact ABI.
 %global debug_package %{nil}
 %undefine _auto_set_build_flags
+%global kver %(v=$(rpm -q --qf '%%{VERSION}-%%{RELEASE}.%%{ARCH}\\n' kernel-devel 2>/dev/null); if test $? -eq 0; then echo "$v" | sort -V | tail -n1; else echo 0; fi)
+%global krel %(echo %{kver} | tr '-' '_')
 Name: ite8291r3-kmod
-Version: 0.0.20261113.4
-Release: 1%{?dist}
-Summary: ITE 8291 multicolor keyboard LED driver
+Version: 0.0.20261114.1
+Release: 1.%{krel}%{?dist}
+Summary: Native ITE keyboard LED driver with quiet idle brightness
 License: GPL-2.0-or-later
-URL: https://github.com/tuxedocomputers/tuxedo-drivers
+URL: https://github.com/MCC45TR/gg-slayer
+Packager: MCC45TR <mcc45tr@gmail.com>
 Source0: ite_8291.tar.gz
-BuildRequires: gcc, kmodtool, elfutils-libelf-devel
-%{expand:%(kmodtool --target %{_target_cpu} --repo local --kmodname %{name} %{?buildforkernels:--%{buildforkernels}} %{?kernels:--for-kernels "%{?kernels}"} 2>/dev/null)}
+ExclusiveArch: x86_64
+BuildRequires: gcc, make, kernel-devel, elfutils-libelf-devel
+Requires: slayerctl
+Requires: kmod-ite8291r3-%{kver} = %{version}-%{release}
+Provides: ite8291r3-kmod-common = %{version}-%{release}
+Obsoletes: ite8291r3-kmod-common < %{version}-%{release}
+Obsoletes: akmod-ite8291r3 < %{version}-%{release}
 %description
-Exposes the ITE 8291 keyboard lighting through the Linux LED class,
-allowing UPower and KDE Powerdevil to control keyboard brightness.
-%package -n ite8291r3-kmod-common
-Summary: Native keyboard LED integration for ITE 8291
-BuildArch: noarch
-%description -n ite8291r3-kmod-common
-Native KDE brightness, coalesced per-key frames and R9T RGB passthrough.
+Prebuilt Native ITE keyboard LED driver with quiet idle brightness. All compilation occurs on COPR; no akmods or local build
+runs on installation. The kernel-specific payload remains available for its ABI.
+
+%package -n kmod-ite8291r3-%{kver}
+Summary: Native ITE keyboard LED driver with quiet idle brightness for %{kver}
+Requires: kernel-uname-r = %{kver}
+Requires: slayerctl
+Provides: kernel-modules-for-kernel = %{kver}
+Provides: installonlypkg(kernel-module)
+%description -n kmod-ite8291r3-%{kver}
+Binary module built on COPR against the exact %{kver} headers.
+
 %prep
-%{?kmodtool_check}
 %setup -q -c -n ite_8291
-for kernel_version in %{?kernel_versions}; do
-    mkdir _kmod_build_${kernel_version%%___*}
-    cp Kbuild ite_8291.c color_contract.h color_model.h _kmod_build_${kernel_version%%___*}/
-done
 %build
-for kernel_version in %{?kernel_versions}; do
-    %make_build -C "${kernel_version##*___}" M="$PWD/_kmod_build_${kernel_version%%___*}" modules
-done
+%make_build -C /usr/src/kernels/%{kver} M="$PWD" modules
 %install
-for kernel_version in %{?kernel_versions}; do
-    install -D -m 0644 _kmod_build_${kernel_version%%___*}/ite_8291.ko \
-        $RPM_BUILD_ROOT/%{kmodinstdir_prefix}/${kernel_version%%___*}/%{kmodinstdir_postfix}/ite_8291.ko
-done
-install -d $RPM_BUILD_ROOT/etc/modules-load.d
-printf 'ite_8291\n' > $RPM_BUILD_ROOT/etc/modules-load.d/ite8291r3.conf
-%{?akmod_install}
-%files -n ite8291r3-kmod-common
+install -D -m0644 ite_8291.ko %{buildroot}%{_prefix}/lib/modules/%{kver}/extra/ite8291r3/ite_8291.ko
+install -d %{buildroot}%{_sysconfdir}/modules-load.d
+printf 'ite_8291\n' > %{buildroot}%{_sysconfdir}/modules-load.d/ite8291r3.conf
+%posttrans -n kmod-ite8291r3-%{kver}
+# Signing with an already enrolled local MOK is not compilation. No new key,
+# enrollment, firmware write, or Secure Boot change is made here.
+%{_libexecdir}/slayerctl-kmod-activate '%{kver}' 'ite8291r3' || :
+%postun -n kmod-ite8291r3-%{kver}
+/usr/sbin/depmod -a '%{kver}' >/dev/null 2>&1 || :
+%files
 %license COPYING
-%config(noreplace) /etc/modules-load.d/ite8291r3.conf
+%config(noreplace) %{_sysconfdir}/modules-load.d/ite8291r3.conf
+%files -n kmod-ite8291r3-%{kver}
+%{_prefix}/lib/modules/%{kver}/extra/ite8291r3/
 %changelog
-* Thu Nov 12 2026 Local system administrator - 0.0.20260731-1.local
-- Use TUXEDO ITE 8291 module revision 76b226bb for native multicolor LEDs.
+* Sat Nov 14 2026 MCC45TR <mcc45tr@gmail.com> - 0.0.20261114.1-1
+- Build binary modules on COPR and sign with an existing enrolled MOK at install.

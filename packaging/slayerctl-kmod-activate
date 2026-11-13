@@ -1,0 +1,31 @@
+#!/bin/bash
+# SPDX-License-Identifier: MIT
+# Called by a kernel-specific COPR RPM after its payload is installed.
+set -euo pipefail
+test "$EUID" -eq 0
+test "$#" -eq 2
+kernel_version=$1
+driver_name=$2
+[[ "$kernel_version" =~ ^[0-9][A-Za-z0-9._+-]*\.x86_64$ ]]
+case "$driver_name" in
+ slayerctl-r9t) module_name=slayerctl_r9t ;;
+ ite8291r3) module_name=ite_8291 ;;
+ *) exit 2 ;;
+esac
+module_file="/usr/lib/modules/$kernel_version/extra/$driver_name/$module_name.ko"
+test -f "$module_file"
+test ! -L "$module_file"
+test "$(stat -c %u "$module_file")" = 0
+if test -z "$(/usr/sbin/modinfo -F signer "$module_file")"; then
+ key=/etc/pki/akmods/private/private_key.priv
+ cert=/etc/pki/akmods/certs/public_key.der
+ if test -f "$key" && test -f "$cert"; then
+  test ! -L "$key"
+  test "$(stat -c %u "$key")" = 0
+  # Never accept a group/world-readable signing key.
+  key_mode=$(stat -c %a "$key")
+  (( (8#$key_mode & 077) == 0 ))
+  /usr/libexec/slayerctl-module-sign sha256 "$key" "$cert" "$module_file"
+ fi
+fi
+/usr/sbin/depmod -a "$kernel_version"

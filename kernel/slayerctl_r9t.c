@@ -550,5 +550,5 @@ module_init(r9t_init);
 module_exit(r9t_exit);
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("Exact-model Game Garaj R9T controls and hwmon");
-MODULE_VERSION("0.1.0");
+MODULE_VERSION("0.1.1");
 MODULE_IMPORT_NS("EFIVAR");

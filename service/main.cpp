@@ -39,7 +39,8 @@ class Service final:public QObject,protected QDBusContext {
     IdleDimmer dimmer;
     QString idleOwner,desktopProfile;
     QStringList desktopChoices;
-    bool powerAvailable=false,idleEnabled=false;
+    bool powerAvailable=false,idleEnabled=false,asleep=false;
+    QString settingsError;
     unsigned idleTimeout=30;
     std::map<std::string,std::string> settings;
     static constexpr auto powerService="org.freedesktop.UPower.PowerProfiles";
@@ -63,7 +64,7 @@ class Service final:public QObject,protected QDBusContext {
     void activateSession(){QProcess::startDetached("/usr/libexec/slayerctl-desktop",{"--reload-session"});}
     QString syncOrigin,syncError,expectedDesktop,expectedHardware;
     void reloadSync(){
-        try{settings=slayer::configurationValues(slayer::Io({}));}catch(const slayer::Error&){settings.clear();}
+        try{settings=slayer::configurationValues(slayer::Io({}));settingsError.clear();}catch(const slayer::Error& e){settings.clear();settingsError=QString::fromStdString(slayer::displayText(e.what()));}
         const bool enabled=settings.contains("performance_sync")&&settings.at("performance_sync")=="on";
         idleEnabled=settings.contains("keyboard_idle_dim")&&settings.at("keyboard_idle_dim")=="on";
         idleTimeout=settings.contains("keyboard_idle_timeout")?unsigned(std::stoi(settings.at("keyboard_idle_timeout"))):30u;
@@ -101,6 +102,7 @@ class Service final:public QObject,protected QDBusContext {
     QString state(){
         auto r=ctlCommand({"ui-data"});if(!r.ok)return {};
         for(const auto& [key,value]:settings)r.output+="value\tsaved_"+QString::fromStdString(key)+"\t"+QString::fromStdString(slayer::displayText(value))+"\n";
+        if(!settingsError.isEmpty())r.output+="value\tconfig_error\t"+settingsError+"\n";
         r.output+="value\tdesktop_profile\t"+desktopProfile+"\nvalue\tdesktop_choices\t"+desktopChoices.join(u' ')+"\nvalue\tdesktop_available\t"+(powerAvailable?"1":"0")+"\n";
         r.output+="value\tkeyboard_idle_available\t"+(dimmer.available()?QString("1"):QString("0"))+"\n";
         if(!syncError.isEmpty())r.output+="value\tperformance_sync_error\t"+QString::fromStdString(slayer::displayText(syncError.toStdString()))+"\n";
@@ -139,7 +141,7 @@ public:
     ~Service()override{if(socketFd>=0)close(socketFd);}
 private Q_SLOTS:
     void seatChanged(const QString&,const QVariantMap& values,const QStringList&){if(values.contains("ActiveSession")&&!idleOwner.isEmpty()&&!activeUser(idleOwner))releaseIdle();}
-    void prepareForSleep(bool sleeping){if(sleeping)releaseIdle();else Q_EMIT SessionSettingsChanged();}
+    void prepareForSleep(bool sleeping){asleep=sleeping;if(sleeping)releaseIdle();Q_EMIT SessionSettingsChanged();}
     void keyboardBrightnessChanged(int){changed();}
     void powerChanged(const QString& interface,const QVariantMap& values,const QStringList& invalidated){
         if(interface!="org.freedesktop.UPower.PowerProfiles"||(!values.contains("ActiveProfile")&&!invalidated.contains("ActiveProfile")))return;
@@ -155,7 +157,7 @@ private Q_SLOTS:
 public Q_SLOTS:
     QVariantMap ReadSessionSettings(){
         touch();
-        return {{"enabled",idleEnabled},{"timeout",idleTimeout},{"powerSaver",desktopProfile=="power-saver"},
+        return {{"enabled",idleEnabled},{"timeout",idleTimeout},{"powerSaver",desktopProfile=="power-saver"},{"sleeping",asleep},
             {"available",dimmer.available()},{"lightingOwner",QString::fromStdString(settings.contains("lighting_owner")?settings.at("lighting_owner"):"")}};
     }
     bool IdleChanged(bool isIdle){
@@ -164,7 +166,7 @@ public Q_SLOTS:
         // Two notifications per idle cycle. No authorization subprocess, TPM
         // access, device enumeration or D-Bus traffic on animation ticks.
         if(!activeUser(sender))return false;
-        if(isIdle&&(!idleEnabled||desktopProfile!="power-saver"))return false;
+        if(isIdle&&(!idleEnabled||asleep||desktopProfile!="power-saver"))return false;
         if(!idleOwner.isEmpty()&&idleOwner!=sender)return false;
         if(!isIdle&&idleOwner.isEmpty())return true;
         idleOwner=sender;clients.addWatchedService(sender);

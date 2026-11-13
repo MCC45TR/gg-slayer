@@ -64,7 +64,7 @@ public Q_SLOTS:
             const auto cfg=result.value();const bool wasEnabled=enabled;
             enabled=cfg.value("enabled").toBool();const unsigned timeout=cfg.value("timeout",30).toUInt();
             owner(cfg.value("lightingOwner").toString());
-            const bool wanted=enabled&&cfg.value("powerSaver").toBool()&&cfg.value("available").toBool();
+            const bool wanted=enabled&&!cfg.value("sleeping").toBool()&&cfg.value("powerSaver").toBool()&&cfg.value("available").toBool();
             if(armed&&(!wanted||seconds!=timeout)){watch.stop();armed=false;isIdle=false;notify(false);}
             seconds=timeout;
             if(wanted&&!armed){armed=watch.start(seconds);if(!armed)error=tr("Bu oturum etkinlik bildirimi sunmuyor.");}

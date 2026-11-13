@@ -1,49 +1,56 @@
-%global buildforkernels akmod
+# SPDX-License-Identifier: MIT
+# Headers and compilation stay on COPR. Each binary module names its exact ABI.
 %global debug_package %{nil}
 %undefine _auto_set_build_flags
+%global kver %(v=$(rpm -q --qf '%%{VERSION}-%%{RELEASE}.%%{ARCH}\\n' kernel-devel 2>/dev/null); if test $? -eq 0; then echo "$v" | sort -V | tail -n1; else echo 0; fi)
+%global krel %(echo %{kver} | tr '-' '_')
 Name: slayerctl-r9t-kmod
-Version: 0.1.0
-Release: 1%{?dist}
+Version: 0.1.1
+Release: 1.%{krel}%{?dist}
 Summary: Exact-model Slayer R9T controls and hwmon bridge
 License: GPL-2.0-only
 URL: https://github.com/MCC45TR/gg-slayer
+Packager: MCC45TR <mcc45tr@gmail.com>
 Source0: slayerctl_r9t.tar.gz
-BuildRequires: gcc, kmodtool, elfutils-libelf-devel
-%{expand:%(kmodtool --target %{_target_cpu} --repo local --kmodname %{name} %{?buildforkernels:--%{buildforkernels}} %{?kernels:--for-kernels "%{?kernels}"} 2>/dev/null)}
+ExclusiveArch: x86_64
+BuildRequires: gcc, make, kernel-devel, elfutils-libelf-devel
+Requires: slayerctl
+Requires: kmod-slayerctl-r9t-%{kver} = %{version}-%{release}
+Provides: slayerctl-r9t-kmod-common = %{version}-%{release}
+Obsoletes: slayerctl-r9t-kmod-common < %{version}-%{release}
+Obsoletes: akmod-slayerctl-r9t < %{version}-%{release}
 %description
-Strict model/BIOS/board/project-gated charge, Fn, factory fan/thermal controls,
-fan RPM and fixed-field next-boot MUX. No arbitrary EC/UEFI, TDP or OC writes.
-%package -n slayerctl-r9t-kmod-common
-Summary: Slayer R9T module loading
-BuildArch: noarch
-%description -n slayerctl-r9t-kmod-common
-Load the exact-model bridge. Loading does not change the charge profile.
+Prebuilt Exact-model Slayer R9T controls and hwmon bridge. All compilation occurs on COPR; no akmods or local build
+runs on installation. The kernel-specific payload remains available for its ABI.
+
+%package -n kmod-slayerctl-r9t-%{kver}
+Summary: Exact-model Slayer R9T controls and hwmon bridge for %{kver}
+Requires: kernel-uname-r = %{kver}
+Requires: slayerctl
+Provides: kernel-modules-for-kernel = %{kver}
+Provides: installonlypkg(kernel-module)
+%description -n kmod-slayerctl-r9t-%{kver}
+Binary module built on COPR against the exact %{kver} headers.
+
 %prep
-%{?kmodtool_check}
 %setup -q -c -n slayerctl_r9t
-for kernel_version in %{?kernel_versions}; do
-    mkdir _kmod_build_${kernel_version%%___*}
-    cp Kbuild slayerctl_r9t.c profile_bits.h model_contract.h firmware_contract.h mux_transaction.h thermal_profile.h _kmod_build_${kernel_version%%___*}/
-done
 %build
-for kernel_version in %{?kernel_versions}; do
-    %make_build -j2 -C "${kernel_version##*___}" M="$PWD/_kmod_build_${kernel_version%%___*}" modules
-done
+%make_build -C /usr/src/kernels/%{kver} M="$PWD" modules
 %install
-for kernel_version in %{?kernel_versions}; do
-    install -D -m 0644 _kmod_build_${kernel_version%%___*}/slayerctl_r9t.ko \
-        $RPM_BUILD_ROOT/%{kmodinstdir_prefix}/${kernel_version%%___*}/%{kmodinstdir_postfix}/slayerctl_r9t.ko
-done
-install -d $RPM_BUILD_ROOT/etc/modules-load.d
-printf 'slayerctl_r9t\n' > $RPM_BUILD_ROOT/etc/modules-load.d/slayerctl-r9t.conf
-%{?akmod_install}
-%files -n slayerctl-r9t-kmod-common
+install -D -m0644 slayerctl_r9t.ko %{buildroot}%{_prefix}/lib/modules/%{kver}/extra/slayerctl-r9t/slayerctl_r9t.ko
+install -d %{buildroot}%{_sysconfdir}/modules-load.d
+printf 'slayerctl_r9t\n' > %{buildroot}%{_sysconfdir}/modules-load.d/slayerctl-r9t.conf
+%posttrans -n kmod-slayerctl-r9t-%{kver}
+# Signing with an already enrolled local MOK is not compilation. No new key,
+# enrollment, firmware write, or Secure Boot change is made here.
+%{_libexecdir}/slayerctl-kmod-activate '%{kver}' 'slayerctl-r9t' || :
+%postun -n kmod-slayerctl-r9t-%{kver}
+/usr/sbin/depmod -a '%{kver}' >/dev/null 2>&1 || :
+%files
 %license COPYING
-%config(noreplace) /etc/modules-load.d/slayerctl-r9t.conf
+%config(noreplace) %{_sysconfdir}/modules-load.d/slayerctl-r9t.conf
+%files -n kmod-slayerctl-r9t-%{kver}
+%{_prefix}/lib/modules/%{kver}/extra/slayerctl-r9t/
 %changelog
-* Fri Nov 13 2026 Local system administrator - 0.0.6-1.local
-- Lock complete EFI transactions and verify rollback after failed stores.
-* Fri Nov 13 2026 Local system administrator - 0.0.5-1.local
-- Add Fn, factory thermal/fan controls, RPM and native fixed-field MUX.
-* Fri Nov 13 2026 Local system administrator - 0.0.4-1.local
-- Add model-gated battery profile and read-only temperature interfaces.
+* Sat Nov 14 2026 MCC45TR <mcc45tr@gmail.com> - 0.1.1-1
+- Build binary modules on COPR and sign with an existing enrolled MOK at install.

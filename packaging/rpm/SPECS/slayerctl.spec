@@ -1,18 +1,21 @@
 Name:           slayerctl
 Version:        0.1.1
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        Game Garaj Slayer hardware control backend
-License:        MIT
+License:        MIT AND LGPL-2.1-or-later
 URL:            https://github.com/MCC45TR/gg-slayer
 Source0:        slayerctl-%{version}.tar.xz
 Packager:       MCC45TR <mcc45tr@gmail.com>
 BuildRequires:  gcc-c++, cmake, make, ninja-build, python3-devel
+BuildRequires:  openssl-devel
 BuildRequires:  qt6-qtbase-devel, qt6-qtdeclarative-devel, extra-cmake-modules
 BuildRequires:  kf6-kcmutils-devel, pkgconfig(xkbcommon), pkgconfig(wayland-client)
 BuildRequires:  pkgconfig(libsystemd), pkgconfig(x11), pkgconfig(xext), wayland-devel
 BuildRequires:  systemd-rpm-macros, desktop-file-utils, breeze-icon-theme
+BuildRequires:  kf6-kirigami, kf6-qqc2-desktop-style, qt6-qtimageformats
 BuildRequires:  desktop-backgrounds-kde, xkeyboard-config
 Requires:       polkit, systemd, systemd-udev, /usr/bin/systemd-creds
+Recommends:     slayerctl-r9t-kmod, ite8291r3-kmod
 %{?systemd_requires}
 %global debug_package %{nil}
 %description
@@ -96,10 +99,12 @@ desktop-file-validate %{buildroot}%{_datadir}/applications/slayer-control-gtk.de
 %udev_rules_update
 
 %files
-%license LICENSE
+%license LICENSE tools/COPYING.LGPL-2.1
 %doc README.md AUTHORS docs/KIRIGAMI-IMPLEMENTATION.md
 %{_bindir}/slayerctl
 %{_libexecdir}/slayerctl-helper
+%{_libexecdir}/slayerctl-module-sign
+%{_libexecdir}/slayerctl-kmod-activate
 %{_libexecdir}/slayerctl-desktop
 %{_libexecdir}/slayerctl-service
 %{_libexecdir}/slayerctl-session

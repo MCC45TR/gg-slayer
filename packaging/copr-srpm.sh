@@ -10,7 +10,6 @@ trap 'rm -rf "$work"' EXIT
 mkdir -p "$work"/{SOURCES,SPECS,SRPMS} "$output"
 if ! command -v rpmbuild >/dev/null; then dnf -y install rpm-build; fi
 if ! command -v git >/dev/null; then dnf -y install git-core; fi
-if test "$spec_name" != slayerctl.spec && ! command -v kmodtool >/dev/null; then dnf -y install kmodtool; fi
 cp "$root/packaging/rpm/SPECS/$spec_name" "$work/SPECS/"
 case "$spec_name" in
  slayerctl.spec)
