@@ -1,0 +1,15 @@
+{
+  "KPlugin": {
+    "Id": "kcm_slayerctl",
+    "Name": "Slayer Control",
+    "Name[en]": "Slayer Control",
+    "Description": "Game Garaj Slayer için durum ve güvenli donanım kontrolleri",
+    "Icon": "computer-laptop",
+    "Version": "@PROJECT_VERSION@",
+    "License": "MIT"
+  },
+  "X-KDE-System-Settings-Parent-Category": "hardware",
+  "X-KDE-Keywords": "Slayer,Game Garaj,BIOS,RGB,keyboard,klavye,fan,battery,pil,MUX,USB",
+  "X-KDE-Weight": 90,
+  "X-KDE-FormFactors": ["desktop"]
+}

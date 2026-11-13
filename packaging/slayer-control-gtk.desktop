@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Slayer Control GTK
+Comment=GNOME frontend placeholder for slayerctl
+Exec=slayer-control-gtk
+Icon=computer-laptop
+Terminal=false
+Categories=Settings;HardwareSettings;
+OnlyShowIn=GNOME;

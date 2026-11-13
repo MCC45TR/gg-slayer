@@ -1,0 +1,4 @@
+# Restore saved choices at boot/resume; installation does not apply settings.
+enable slayerctl.service
+enable slayerctl-resume.service
+disable slayerctl-restore.service

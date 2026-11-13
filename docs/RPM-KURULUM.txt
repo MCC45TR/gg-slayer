@@ -1,0 +1,43 @@
+Slayer Control 0.0.7 — Fedora RPM paketleri
+
+slayerctl        CLI, polkit yardımcısı, udev ve açılış/uyanma birimleri.
+slayerctl-gui    Qt Slayer Control uygulaması.
+slayerctl-kde    KDE Sistem Ayarları modülü.
+slayerctl-gnome  Mevcut GNOME oturumu için Quick Settings dosyaları.
+slayerctl-face   Hazırlanmış Howdy kurulumu için metin tabanlı yardımcı.
+
+Derleme: ./packaging/build-rpm.sh
+İmzalama aracı: sudo dnf install rpm-sign
+Yerel imza: sudo python3 packaging/sign-rpm.py
+Çıktılar: packaging/rpm/RPMS/{x86_64,noarch}/ ve packaging/rpm/SRPMS/.
+Sürüm VERSION ile spec içinde aynı tutulur. RPM Release paketleme revizyonudur.
+İki derleme işi kullanılır; araştırma indirmeleri ve eski derlemeler kaynak
+arşivine eklenmez. Testler geçici donanım dosyaları ve offscreen Qt kullanır.
+Fedora'nın imza doğrulaması kapatılmaz. Ayrı yerel OpenPGP anahtarı yalnız
+root erişimli /var/lib/slayerctl-rpm-signing altında tutulur; özel anahtar
+kaynak arşivine veya RPM içine konmaz. Genel anahtar/fingerprint packaging/rpm
+altındadır. Bu anahtar kernel Secure Boot/MOK anahtarından bağımsızdır.
+
+Yerel paketleri DNF ile kurun. Aynı sürümün CLI/GUI/KDE paketleri birlikte
+yükseltilmelidir. GNOME dosyaları ikinci bir masaüstü kurmaz veya eklentiyi
+kendiliğinden etkinleştirmez. Mevcut imzalı R9T/RGB sürücü RPM'leri ayrıdır;
+uygulama paketleri kernel modülü derlemez veya Secure Boot anahtarına dokunmaz.
+
+/etc/slayerctl yapılandırması ve örnek profiller RPM config(noreplace) ile
+korunur. Güncelleme donanım ayarı uygulamaz; mevcut açılış/uyanma tercihleri
+korunur. Mevcut Howdy yapılandırmasına/PAM'a veya kayıtlı yüzlere dokunulmaz.
+slayer-face artık /usr/bin/slayer-face altındadır; eski /usr/local kopyası
+ilk geçişte yedeklenip kaldırılır. Yüz kaydı yalnız açık enroll komutuyla olur.
+
+Elle kurulumdan ilk geçişte:
+1. Paketleri derleyip tüm testleri geçirin; DNF önizlemesini inceleyin.
+2. RPM tarafından sahiplenilmemiş eski dosyaları, yapılandırmayı ve systemd
+   etkinlik durumunu yedekleyin. Sürücü RPM'lerini kaldırmayın.
+3. Eski program/entegrasyon dosyalarını kaldırıp paketleri DNF ile kurun.
+   /etc/slayerctl içeriğini silmeyin; mevcut seçimler yerinde kalmalıdır.
+4. rpm -V, dnf check, dosya sahipliği ve salt okunur durum kontrollerini yapın.
+   Eski açık uygulama yeni sürüm açılana kadar bellekte kalabilir.
+
+Paketler yerel olarak üretilir; bir internet deposuna yayımlanmış değildir.
+İlk kurulumda DNF'ye yerel RPM yolları verilir. Sonraki kaldırma/güncelleme
+işlemleri paket adlarıyla yapılabilir.

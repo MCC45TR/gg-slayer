@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+ <id>io.github.MCC45TR.slayer_control_qt</id>
+ <metadata_license>CC0-1.0</metadata_license><project_license>MIT</project_license>
+ <name>Slayer Control Qt</name><summary>Native KDE frontend for the slayerctl device control backend.</summary>
+ <description><p>Native KDE frontend for the slayerctl device control backend.</p></description>
+ <developer id="io.github.MCC45TR"><name>MCC45TR</name></developer>
+ <update_contact>mcc45tr@gmail.com</update_contact>
+ <url type="homepage">https://github.com/MCC45TR/gg-slayer</url>
+ <url type="bugtracker">https://github.com/MCC45TR/gg-slayer/issues</url>
+ <launchable type="desktop-id">slayer-control.desktop</launchable>
+ <provides><binary>slayer-control-qt</binary></provides><content_rating type="oars-1.1"/>
+</component>

@@ -1,0 +1,2 @@
+# Adapter/USB-PD events only: no battery capacity polling or periodic daemon.
+ACTION=="change", SUBSYSTEM=="power_supply", ENV{POWER_SUPPLY_TYPE}=="Mains|USB|USB_C|USB_PD|USB_PD_DRP", RUN+="/usr/bin/systemctl --no-block start slayerctl-power-event.service"

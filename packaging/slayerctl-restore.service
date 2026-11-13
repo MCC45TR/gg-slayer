@@ -1,0 +1,22 @@
+[Unit]
+Description=Restore explicitly configured Slayer hardware settings
+After=systemd-modules-load.service
+ConditionPathExists=/etc/slayerctl/slayerctl.conf
+
+[Service]
+Type=oneshot
+RuntimeDirectory=slayerctl
+RuntimeDirectoryMode=0755
+RuntimeDirectoryPreserve=yes
+ReadWritePaths=/run/slayerctl /run/lock
+ExecStart=/usr/bin/slayerctl apply-config
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+RestrictAddressFamilies=AF_UNIX
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+
+[Install]
+WantedBy=multi-user.target

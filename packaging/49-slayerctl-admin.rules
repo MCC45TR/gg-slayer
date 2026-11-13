@@ -1,0 +1,8 @@
+// Only an active, local administrator may bypass authentication for this
+// application's narrowly validated API. Recovery always requires authentication.
+polkit.addRule(function(action, subject) {
+    if (action.id === "org.gamegaraj.slayerctl.control" && subject.local && subject.active &&
+        (subject.isInGroup("wheel") || subject.isInGroup("sudo"))) {
+        return polkit.Result.YES;
+    }
+});

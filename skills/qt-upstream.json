@@ -1,0 +1,101 @@
+{
+  "repository": "https://github.com/TheQtCompanyRnD/agent-skills",
+  "ref": "062f7c9f0e16b7d2f66cd55e449a3ed85fba699e",
+  "files": [
+    {
+      "path": "skills/qt-cpp-review/LICENSE.txt",
+      "git_blob_sha1": "d770eea3c5ecd04845feab7a0ef0652fe98bcf7e",
+      "bytes": 1509
+    },
+    {
+      "path": "skills/qt-cpp-review/SKILL.md",
+      "git_blob_sha1": "58d3ca33a8940855496053acc47f305adfa96d27",
+      "bytes": 11878
+    },
+    {
+      "path": "skills/qt-cpp-review/platforms/windsurf.md",
+      "git_blob_sha1": "3967c674f1e9ac8085f6b7aab589d20d59cde3ae",
+      "bytes": 1310
+    },
+    {
+      "path": "skills/qt-cpp-review/references/agent-rules.md",
+      "git_blob_sha1": "87d6da6ca481b40732083a695fa0dff778adf668",
+      "bytes": 10486
+    },
+    {
+      "path": "skills/qt-cpp-review/references/lint-scripts/qt_review_lint.py",
+      "git_blob_sha1": "f42f01127a752599cca224db1c3be31aa43cef98",
+      "bytes": 37704
+    },
+    {
+      "path": "skills/qt-cpp-review/references/qt-deprecated-classes.md",
+      "git_blob_sha1": "564929241aea1d8255f8515007c5c2311c5bc087",
+      "bytes": 2483
+    },
+    {
+      "path": "skills/qt-cpp-review/references/qt-framework-checklist.md",
+      "git_blob_sha1": "324b565e88fef71bde4359441b4f35d720518913",
+      "bytes": 6926
+    },
+    {
+      "path": "skills/qt-cpp-review/references/qt-review-checklist.md",
+      "git_blob_sha1": "e77974c921e5f889a1d208de4df6e6d3f0166a16",
+      "bytes": 11077
+    },
+    {
+      "path": "skills/qt-qml-review/LICENSE.txt",
+      "git_blob_sha1": "d770eea3c5ecd04845feab7a0ef0652fe98bcf7e",
+      "bytes": 1509
+    },
+    {
+      "path": "skills/qt-qml-review/SKILL.md",
+      "git_blob_sha1": "6b2edb00904d2a4509b5157cacfbcf8bdbdba720",
+      "bytes": 10175
+    },
+    {
+      "path": "skills/qt-qml-review/platforms/windsurf.md",
+      "git_blob_sha1": "7569c66542675b7aba1038dd378ed9e20f27578b",
+      "bytes": 1699
+    },
+    {
+      "path": "skills/qt-qml-review/references/agent-rules.md",
+      "git_blob_sha1": "bdf622a28ddfb56d1ca43992c4f93aabe5859103",
+      "bytes": 10793
+    },
+    {
+      "path": "skills/qt-qml-review/references/lint-scripts/qt_qml_lint.py",
+      "git_blob_sha1": "c855629b37ce5eb653c493d3dd46200aeacd3f32",
+      "bytes": 69770
+    },
+    {
+      "path": "skills/qt-qml-review/references/qt-qml-review-checklist.md",
+      "git_blob_sha1": "9669f42e0a3ca16778505159c7cf0b5a125d3a1b",
+      "bytes": 12825
+    },
+    {
+      "path": "skills/qt-qml/LICENSE.txt",
+      "git_blob_sha1": "d770eea3c5ecd04845feab7a0ef0652fe98bcf7e",
+      "bytes": 1509
+    },
+    {
+      "path": "skills/qt-qml/SKILL.md",
+      "git_blob_sha1": "f50b00d0f430f66f3bbb2c24e910f419166acbf9",
+      "bytes": 14244
+    },
+    {
+      "path": "skills/qt-qml/platforms/windsurf.md",
+      "git_blob_sha1": "c1e8a2d8fc7b12cc14ae006f41a7b7e9e08e2147",
+      "bytes": 1490
+    },
+    {
+      "path": "skills/qt-ui-design/LICENSE.txt",
+      "git_blob_sha1": "d770eea3c5ecd04845feab7a0ef0652fe98bcf7e",
+      "bytes": 1509
+    },
+    {
+      "path": "skills/qt-ui-design/SKILL.md",
+      "git_blob_sha1": "a0d6886a6debe2785a9388db1485af5bd9237073",
+      "bytes": 25612
+    }
+  ]
+}

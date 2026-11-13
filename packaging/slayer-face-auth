@@ -1,0 +1,262 @@
+#!/usr/bin/python3
+"""Howdy enrollment/test frontend; no PAM changes or automatic enrollment."""
+import argparse
+import configparser
+import fcntl
+import json
+import math
+import os
+import pwd
+from pathlib import Path
+import select
+import signal
+import stat
+import subprocess
+import sys
+import tempfile
+import time
+
+USER = pwd.getpwuid(os.getuid()).pw_name
+CONFIG = Path('/etc/howdy/config.ini')
+MODEL = Path('/etc/howdy/models') / (USER + '.dat')
+APP = Path('/usr/lib64/howdy')
+LOCK = Path('/run/lock/slayer-face-auth.lock')
+ROOT_UID = 0
+MAX_MODEL_BYTES = 65536
+
+
+def require_root():
+    if os.geteuid() != 0:
+        raise RuntimeError('Bu komut için sudo kullanın.')
+
+
+def trusted(path, directory=False, private=False):
+    info = path.lstat()
+    kind = stat.S_ISDIR(info.st_mode) if directory else stat.S_ISREG(info.st_mode)
+    forbidden = 0o077 if private else 0o022
+    if not kind or info.st_uid != ROOT_UID or info.st_mode & forbidden:
+        raise RuntimeError('Güvensiz sahiplik/izin veya bağlantı: ' + str(path))
+    return info
+
+
+def validate_model(data):
+    try:
+        rows = json.loads(data)
+        if not isinstance(rows, list) or not rows or len(rows) > 32:
+            raise ValueError('model listesi')
+        identifiers = set()
+        for row in rows:
+            identifier, encoding = row['id'], row['data']
+            if type(identifier) is not int or identifier < 0 or identifier in identifiers:
+                raise ValueError('model kimliği')
+            identifiers.add(identifier)
+            if not isinstance(row['label'], str) or not 0 < len(row['label']) <= 256:
+                raise ValueError('model etiketi')
+            # Howdy add.py appends a descriptor to data; compare.py flattens
+            # this list of descriptors. A flat 128-value list is incompatible.
+            if not isinstance(encoding, list) or not 1 <= len(encoding) <= 8:
+                raise ValueError('yüz vektörü listesi')
+            for vector in encoding:
+                if not isinstance(vector, list) or len(vector) != 128:
+                    raise ValueError('128 bileşenli yüz vektörü')
+                if any(type(value) not in (int, float) or not math.isfinite(value) for value in vector):
+                    raise ValueError('geçersiz yüz vektörü')
+    except (ValueError, TypeError, KeyError, OverflowError) as error:
+        raise RuntimeError('Yüz modeli bozuk veya desteklenmeyen biçimde.') from error
+
+
+def model_data():
+    try:
+        info = trusted(MODEL, private=True)
+    except FileNotFoundError:
+        return None
+    if not 0 < info.st_size <= MAX_MODEL_BYTES:
+        raise RuntimeError('Yüz modeli boyutu beklenenden farklı.')
+    data = MODEL.read_bytes()
+    if len(data) > MAX_MODEL_BYTES:
+        raise RuntimeError('Yüz modeli okuma sırasında değişti.')
+    validate_model(data)
+    return data
+
+
+def camera_identity(node, sysfs=Path('/sys/class/video4linux')):
+    entry = sysfs / node
+    if (entry / 'name').read_text().strip() != 'FHD WebCam: IR Camera':
+        raise RuntimeError('Seçilen uç nokta doğrulanan IR kamera değil; görüntü alınmadı.')
+    interface = (entry / 'device').resolve(strict=True)
+    usb = interface.parent
+    fields = {name: (usb / name).read_text().strip() for name in ('idVendor', 'idProduct', 'bcdDevice', 'removable')}
+    if fields != dict(idVendor='2b7e', idProduct='c906', bcdDevice='0004', removable='fixed'):
+        raise RuntimeError('Dahili kamera kimliği/revizyonu doğrulanamadı; görüntü alınmadı.')
+    if (interface / 'bInterfaceNumber').read_text().strip() != '02':
+        raise RuntimeError('IR kamera arayüz numarası eşleşmiyor.')
+
+
+def configured_camera(config):
+    device = Path(config['video']['device_path'])
+    if not device.is_absolute() or not device.is_char_device():
+        raise RuntimeError('IR kamera hazır değil. Slayer Control kamera erişimini açıp yeniden deneyin.')
+    camera_identity(device.resolve(strict=True).name)
+    return device
+
+
+def operation_lock():
+    fd = os.open(LOCK, os.O_WRONLY | os.O_CREAT | os.O_CLOEXEC | os.O_NOFOLLOW, 0o600)
+    try:
+        info = os.fstat(fd)
+        if not stat.S_ISREG(info.st_mode) or info.st_uid != ROOT_UID or info.st_nlink != 1 or info.st_mode & 0o022:
+            raise RuntimeError('Yüz tanıma kilit dosyası güvenli değil.')
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        return fd
+    except BaseException:
+        os.close(fd)
+        raise
+
+
+def run_process(argv, env, timeout):
+    """Wait on a pidfd, and reap the whole group on completion or cancellation."""
+    def cancelled(_number, _frame):
+        raise KeyboardInterrupt
+    handlers = {number: signal.signal(number, cancelled) for number in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP)}
+    process = None
+    pidfd = None
+    try:
+        process = subprocess.Popen(argv, env=env, cwd=APP, start_new_session=True)
+        pidfd = os.pidfd_open(process.pid)
+        waiter = select.poll()
+        waiter.register(pidfd, select.POLLIN)
+        if not waiter.poll(int(timeout * 1000)):
+            raise subprocess.TimeoutExpired(argv, timeout)
+        # Keep the leader unreaped so its PID cannot be reused before cleanup.
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        return process.wait(timeout=2)
+    except BaseException:
+        if process is not None:
+            for number in handlers:
+                signal.signal(number, signal.SIG_IGN)
+            try:
+                os.killpg(process.pid, signal.SIGTERM)
+                time.sleep(0.15)
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            process.wait(timeout=2)
+        raise
+    finally:
+        if pidfd is not None:
+            os.close(pidfd)
+        for number, handler in handlers.items():
+            signal.signal(number, handler)
+
+
+def restore_model(previous):
+    if previous is None:
+        try:
+            trusted(MODEL, private=True)
+            MODEL.unlink()
+        except FileNotFoundError:
+            pass
+        return
+    fd, name = tempfile.mkstemp(prefix='.face-restore-', dir=MODEL.parent)
+    try:
+        with os.fdopen(fd, 'wb') as output:
+            output.write(previous)
+            output.flush()
+            os.fsync(output.fileno())
+        os.replace(name, MODEL)
+        directory = os.open(MODEL.parent, os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC | os.O_NOFOLLOW)
+        try:
+            os.fsync(directory)
+        finally:
+            os.close(directory)
+    finally:
+        if os.path.exists(name):
+            os.unlink(name)
+
+
+def authenticate(command, config):
+    require_root()
+    trusted(CONFIG)
+    trusted(MODEL.parent, directory=True, private=True)
+    trusted(APP, directory=True)
+    fd = operation_lock()
+    previous_umask = None
+    try:
+        previous = model_data()
+        if command == 'test' and previous is None:
+            raise RuntimeError('Önce sudo slayer-face-auth enroll ile yüzünüzü kaydedin. Kamera açılmadı.')
+        configured_camera(config)
+        env = dict(PATH='/usr/bin:/bin', LANG='C.UTF-8', OPENBLAS_NUM_THREADS='1', OMP_NUM_THREADS='1', MKL_NUM_THREADS='1')
+        previous_umask = os.umask(0o077)
+        if command == 'enroll':
+            print('Kameraya düz bakın. Kayıt başlayacak; giriş ayarları değişmeyecek.', flush=True)
+            successful = False
+            try:
+                result = run_process(['/usr/bin/python3', str(APP / 'cli.py'), '--user', USER, '-y', 'add', 'IR'], env, 40)
+                if result != 0:
+                    return result
+                if model_data() is None:
+                    raise RuntimeError('Kaydedilen yüz modeli doğrulanamadı.')
+                successful = True
+            finally:
+                if not successful:
+                    restore_model(previous)
+            print('Yüz kaydı hazır. Sonraki adım: sudo slayer-face-auth test')
+            print('Kayıt işlemi yüzle girişi otomatik etkinleştirmez.')
+            return 0
+        print('IR kameraya bakın; dört saniyelik tanıma testi. Giriş ayarları değişmeyecek.', flush=True)
+        result = run_process(['/usr/bin/python3', str(APP / 'compare.py'), USER], env, 20)
+        print('Yüz eşleşmesi başarılı.' if result == 0 else 'Yüz doğrulanamadı; hata kodu: ' + str(result))
+        return result
+    finally:
+        if previous_umask is not None:
+            os.umask(previous_umask)
+        os.close(fd)
+
+
+def main():
+    parser = argparse.ArgumentParser(description='IR yüz kaydı ve metin tabanlı test; PAM etkinleştirmez.', epilog='Developer: MCC45TR <mcc45tr@gmail.com>')
+    parser.add_argument('command', choices=['status', 'enroll', 'test'], nargs='?', default='status')
+    parser.add_argument('--user',help='Hedef yerel kullanıcı; başka kullanıcı için yönetici gerekir.')
+    args = parser.parse_args()
+    global USER, MODEL
+    uid=os.getuid()
+    for name in ('PKEXEC_UID','SUDO_UID'):
+        value=os.environ.get(name,'')
+        if uid==0 and value.isdecimal() and int(value)>0:
+            uid=int(value);break
+    account=pwd.getpwnam(args.user) if args.user else pwd.getpwuid(uid)
+    if os.geteuid()!=0 and account.pw_uid!=os.getuid():raise RuntimeError('Başka kullanıcı için yönetici gerekir.')
+    if account.pw_uid==0:raise RuntimeError('Hedef kullanıcıyı --user KULLANICI ile seçin.')
+    USER=account.pw_name
+    MODEL=Path('/etc/howdy/models')/(USER+'.dat')
+    config = configparser.ConfigParser()
+    if not config.read(CONFIG):
+        raise RuntimeError('Howdy yapılandırması bulunamadı.')
+    if args.command != 'status':
+        return authenticate(args.command, config)
+    print('Kullanıcı:', USER)
+    print('IR kamera:', config['video']['device_path'])
+    print('Howdy motor ayarı:', 'devre dışı' if config.getboolean('core', 'disabled') else 'etkin')
+    if os.geteuid() == 0:
+        print('Yüz kaydı:', 'var' if model_data() is not None else 'yok')
+    else:
+        print('Yüz kaydı: ayrıntı için sudo slayer-face-auth status')
+    print('Kayıt: sudo slayer-face-auth enroll')
+    print('Penceresiz test: sudo slayer-face-auth test')
+    print('Motor ayarı PAM entegrasyonunun kanıtı değildir; KDE giriş/izin testleri ayrıca yapılmalı.')
+    return 0
+
+
+if __name__ == '__main__':
+    try:
+        raise SystemExit(main())
+    except KeyboardInterrupt:
+        print('slayer-face-auth: İşlem iptal edildi; kamera süreçleri kapatıldı.', file=sys.stderr)
+        raise SystemExit(130)
+    except (OSError, RuntimeError, ValueError, KeyError, configparser.Error, subprocess.TimeoutExpired) as error:
+        print('slayer-face-auth:', error, file=sys.stderr)
+        raise SystemExit(2)

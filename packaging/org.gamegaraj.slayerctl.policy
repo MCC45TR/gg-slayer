@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN" "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
+<policyconfig>
+  <vendor>slayerctl</vendor>
+  <action id="org.gamegaraj.slayerctl.apply">
+    <description>Apply validated Slayer hardware settings</description>
+    <description xml:lang="tr">Doğrulanmış Slayer donanım ayarlarını uygula</description>
+    <message>Administrator authentication is required to change hardware settings.</message>
+    <message xml:lang="tr">Donanım ayarlarını değiştirmek için yönetici doğrulaması gerekiyor.</message>
+    <defaults><allow_any>no</allow_any><allow_inactive>no</allow_inactive><allow_active>auth_admin_keep</allow_active></defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/libexec/slayerctl-helper</annotate>
+  </action>
+  <action id="org.gamegaraj.slayerctl.control">
+    <description>Manage validated Slayer settings</description>
+    <message xml:lang="tr">Cihaz ayarlarını değiştirmek için yönetici doğrulaması gerekiyor.</message>
+    <message>Administrator authentication is required to manage device settings.</message>
+    <defaults><allow_any>no</allow_any><allow_inactive>no</allow_inactive><allow_active>auth_admin_keep</allow_active></defaults>
+  </action>
+  <action id="org.gamegaraj.slayerctl.recover">
+    <description>Recreate TPM-bound Slayer configuration</description>
+    <message>Authenticate to recreate TPM-bound configuration. Previous preferences cannot be recovered.</message>
+    <defaults><allow_any>no</allow_any><allow_inactive>no</allow_inactive><allow_active>auth_admin</allow_active></defaults>
+  </action>
+</policyconfig>

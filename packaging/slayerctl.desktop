@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Slayer Control
+Comment=Klavye, RGB, güç, pil ve donanım ayarları
+Icon=computer-laptop
+Exec=slayer-control-qt
+Categories=Settings;HardwareSettings;Qt;KDE;
+Terminal=false

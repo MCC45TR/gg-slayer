@@ -1,0 +1,24 @@
+[Unit]
+Description=Slayer Control - restore selected hardware settings
+After=systemd-modules-load.service
+ConditionPathExists=/etc/slayerctl/slayerctl.conf
+Conflicts=slayerctl-restore.service
+
+[Service]
+Type=oneshot
+RuntimeDirectory=slayerctl
+RuntimeDirectoryMode=0755
+RuntimeDirectoryPreserve=yes
+ReadWritePaths=/run/slayerctl /run/lock
+ExecStart=/usr/bin/slayerctl apply-config
+TimeoutStartSec=20
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+RestrictAddressFamilies=AF_UNIX
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+
+[Install]
+WantedBy=multi-user.target

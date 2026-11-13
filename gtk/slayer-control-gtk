@@ -1,0 +1,19 @@
+#!/usr/bin/python3
+# SPDX-License-Identifier: MIT
+"""GNOME frontend placeholder. Hardware operations belong to slayerctl."""
+import gi
+gi.require_version('Gtk','4.0')
+from gi.repository import Gtk
+class Application(Gtk.Application):
+    def __init__(self):super().__init__(application_id='io.github.MCC45TR.SlayerControlGtk')
+    def do_activate(self):
+        window=Gtk.ApplicationWindow(application=self,title='Slayer Control GTK')
+        window.set_default_size(480,280)
+        box=Gtk.Box(orientation=Gtk.Orientation.VERTICAL,spacing=20)
+        for name in ['top','bottom','start','end']:getattr(box,'set_margin_'+name)(24)
+        title=Gtk.Label(label='Slayer Control GTK');title.add_css_class('title-1');box.append(title)
+        body=Gtk.Label(label='GNOME arayüzü hazırlık aşamasında.\nCihaz denetimi slayerctl arka ucu üzerinden kullanılabilir.');body.set_wrap(True);box.append(body)
+        author=Gtk.Label(label='MCC45TR · mcc45tr@gmail.com');author.add_css_class('dim-label');box.append(author)
+        close=Gtk.Button(label='Kapat');close.connect('clicked',lambda _:window.close());box.append(close)
+        window.set_child(box);window.present()
+raise SystemExit(Application().run())

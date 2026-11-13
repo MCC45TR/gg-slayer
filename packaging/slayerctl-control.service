@@ -1,0 +1,21 @@
+[Unit]
+Description=Slayer Control on-demand hardware broker
+After=dbus.service systemd-modules-load.service
+
+[Service]
+Type=dbus
+BusName=org.gamegaraj.Slayer1
+ExecStart=/usr/libexec/slayerctl-service
+User=root
+RuntimeDirectory=slayerctl
+RuntimeDirectoryMode=0700
+RuntimeDirectoryPreserve=yes
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/etc/slayerctl /run/lock /run/slayerctl /sys
+ProtectHome=yes
+PrivateTmp=yes
+RestrictAddressFamilies=AF_UNIX AF_NETLINK
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+TimeoutStopSec=10
