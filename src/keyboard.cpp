@@ -13,7 +13,6 @@
 #include <unistd.h>
 
 namespace slayer {
-static const std::vector<std::string> busBase={"/usr/bin/qdbus-qt6","org.kde.kded6","/modules/kameleon"};
 static bool colorLed(const Led &l) {
     return l.channels.size()==3 && std::find(l.channels.begin(),l.channels.end(),"red")!=l.channels.end()
         && std::find(l.channels.begin(),l.channels.end(),"green")!=l.channels.end()
@@ -43,10 +42,7 @@ void keyboard(const Io &io,const std::vector<std::string>&a) {
         if(io.fixture())throw Error("Test kipinde oturum D-Bus'una erişilmez.",4);
         if(geteuid()==0)throw Error("KDE vurgu rengi komutunu sudo olmadan, kendi oturumunuzda çalıştırın.");
         if(io.dry()){std::cout<<"Önizleme: KDE vurgu rengi "<<a[1]<<'\n';return;}
-        auto args=busBase;
-        if(a[1]=="status")args.push_back("org.kde.kameleon.isEnabled");
-        else {args.push_back("org.kde.kameleon.setEnabled");args.push_back(a[1]=="on"?"true":"false");}
-        auto output=capture(args);std::cout<<(output.empty()?"KDE renk ayarı uygulandı.":output)<<'\n';return;
+        std::cout<<capture({"/usr/libexec/slayerctl-desktop","--accent",a[1]},7000);return;
     }
     if(!a.empty()&&a[0]=="layout"){layout(io,{a.begin()+1,a.end()});return;}
     if(!a.empty()&&a[0]=="color-profile"){colorProfile(io,{a.begin()+1,a.end()});return;}

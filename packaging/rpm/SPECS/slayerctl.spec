@@ -1,6 +1,6 @@
 Name:           slayerctl
 Version:        0.1.1
-Release:        3%{?dist}
+Release:        4%{?dist}
 Summary:        Game Garaj Slayer hardware control backend
 License:        MIT AND LGPL-2.1-or-later
 URL:            https://github.com/MCC45TR/gg-slayer
@@ -100,7 +100,7 @@ desktop-file-validate %{buildroot}%{_datadir}/applications/slayer-control-gtk.de
 
 %files
 %license LICENSE tools/COPYING.LGPL-2.1
-%doc README.md AUTHORS docs/KIRIGAMI-IMPLEMENTATION.md
+%doc README.md AUTHORS docs/KIRIGAMI-IMPLEMENTATION.md docs/COPR.md docs/IDLE-DIMMING.md docs/KDE-FACE.md
 %{_bindir}/slayerctl
 %{_libexecdir}/slayerctl-helper
 %{_libexecdir}/slayerctl-module-sign

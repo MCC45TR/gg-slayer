@@ -28,6 +28,14 @@ static int reloadSession(){
 int main(int argc,char** argv){
     QCoreApplication app(argc,argv);auto args=app.arguments();args.removeFirst();
     if(args==QStringList{"--reload-session"}||args==QStringList{"--reload-session-user"})return reloadSession();
+    if(args.size()==2&&args[0]=="--accent"&&QStringList{"status","on","off"}.contains(args[1])&&geteuid()!=0){
+        QDBusInterface accent("org.kde.kded6","/modules/kameleon","org.kde.kameleon",QDBusConnection::sessionBus());accent.setTimeout(2000);
+        if(args[1]=="status"){
+            QDBusReply<bool> result=accent.call("isEnabled");if(!result.isValid())return 4;
+            QTextStream(stdout)<<(result.value()?"true":"false")<<'\n';return 0;
+        }
+        return QDBusReply<void>(accent.call("setEnabled",args[1]=="on")).isValid()?0:4;
+    }
     if(args.value(0)=="--idle"){
         QDBusInterface core("org.gamegaraj.Slayer1","/org/gamegaraj/Slayer1","org.gamegaraj.Slayer1",QDBusConnection::systemBus());core.setTimeout(90000);
         if(args.size()==1||args==QStringList{"--idle","status"}){
