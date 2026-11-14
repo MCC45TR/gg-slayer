@@ -1,0 +1,2 @@
+light status 0 captures 64 errors []
+dark-large status 0 captures 64 errors []

@@ -11,10 +11,26 @@ namespace {
 constexpr auto service="org.gamegaraj.Slayer1";
 constexpr auto path="/org/gamegaraj/Slayer1";
 QDBusMessage call(const QString& method){return QDBusMessage::createMethodCall(service,path,service,method);}
+QStringList controlKey(const QStringList& command){
+    const auto family=command.value(0),action=command.value(1);
+    if(family=="config"&&action=="set"){
+        if(command.size()<4||command.size()%2)return {};
+        QStringList key{family,action};
+        for(qsizetype i=2;i<command.size();i+=2)key.append(command[i]);
+        return key;
+    }
+    if(family=="keyboard"){
+        if(action=="brightness"||action=="color")return {family,action};
+        if(action=="key")return command.mid(0,3);
+    }
+    if(family=="settings"||family=="cpu"||family=="power"||(family=="profile"&&action=="set"))return command.mid(0,2);
+    if(family=="usb")return command.mid(0,3);
+    return {};
+}
 }
 Controller::Controller(SlayerBackend* backend,bool fixtureMode,QObject* parent):QObject(parent),device(backend),fixture(fixtureMode){
-    QSettings preferences;reduce=preferences.value("reducedMotion",false).toBool();
-    timer.setInterval(3000);connect(&timer,&QTimer::timeout,this,&Controller::telemetry);
+    QSettings preferences;reduce=preferences.value("reducedMotion",true).toBool();live=preferences.value("liveTelemetry",false).toBool();
+    timer.setInterval(10000);connect(&timer,&QTimer::timeout,this,&Controller::telemetry);
     if(!fixture){
         QDBusConnection::systemBus().connect(service,path,service,"StateChanged",this,SLOT(stateChanged()));
 
@@ -27,20 +43,31 @@ void Controller::setActive(bool value){
     if(!fixture){QDBusConnection::systemBus().asyncCall(call(value?"Subscribe":"Unsubscribe"));if(value)refresh();}
     Q_EMIT changed();
 }
-void Controller::setMonitoring(bool value){if(visible==value)return;visible=value;if(value){timer.start();telemetry();}else timer.stop();Q_EMIT changed();}
+void Controller::setMonitoring(bool value){if(visible==value)return;visible=value;if(value){if(live&&!fixture)timer.start();telemetry();}else{timer.stop();previousTotal=previousIdle=0;}Q_EMIT changed();}
 void Controller::setReducedMotion(bool value){reduce=value;if(!fixture)QSettings().setValue("reducedMotion",value);Q_EMIT changed();}
+void Controller::setLiveTelemetry(bool value){
+    if(live==value)return;
+    live=value;if(!fixture)QSettings().setValue("liveTelemetry",value);
+    if(live&&visible&&!fixture){previousTotal=previousIdle=0;timer.start();telemetry();}else timer.stop();
+    Q_EMIT changed();
+}
 void Controller::refresh(){
     if(fixture){values={{"cpu_usage",23},{"gpu_usage",12},{"cpu_fan",1850},{"gpu_fan",1720},{"cpu_temp",48},{"gpu_temp",43}};power="balanced";ppChoices={"power-saver","balanced","performance"};ppAvailable=true;Q_EMIT metricsChanged();Q_EMIT changed();return;}
+    if(refreshing){refreshPending=true;return;}
+    refreshing=true;
     auto* watcher=new QDBusPendingCallWatcher(QDBusConnection::systemBus().asyncCall(call("ReadState"),20000),this);
-    connect(watcher,&QDBusPendingCallWatcher::finished,this,[this,watcher]{QDBusPendingReply<QString> reply=*watcher;watcher->deleteLater();if(reply.isError()){lastError=tr("Cihaz servisine ulaşılamadı: %1").arg(reply.error().message());device->acceptData({});}else{device->acceptData(reply.value());readPower();const auto problem=device->info().value("config_error").toString();if(!problem.isEmpty())lastError=problem;}Q_EMIT changed();});
+    connect(watcher,&QDBusPendingCallWatcher::finished,this,[this,watcher]{QDBusPendingReply<QString> reply=*watcher;watcher->deleteLater();refreshing=false;if(reply.isError()){stateError=tr("Cihaz servisine ulaşılamadı: %1").arg(reply.error().message());device->acceptData({});power.clear();ppChoices.clear();ppAvailable=false;}else{device->acceptData(reply.value());readPower();stateError=device->info().value("config_error").toString();}Q_EMIT changed();if(refreshPending){refreshPending=false;refresh();}});
 }
 void Controller::apply(const QStringList& command,const QStringList& remember){
     if(command.isEmpty())return;
-    if(working&&inFlight.command==command&&inFlight.remember==remember)return;
+    if(working&&queue.isEmpty()&&inFlight.command==command&&inFlight.remember==remember)return;
     if(fixture){lastError=tr("Önizlemede donanım ve dosya yazmaları kapalıdır.");Q_EMIT changed();return;}
-    // Coalesce pending edits of the same control; preserve ordering across controls.
-    for(auto& pending:queue)if(pending.command.mid(0,2)==command.mid(0,2)){pending={command,remember};return;}
-    if(queue.size()<16)queue.enqueue({command,remember});
+    // Only adjacent setters of the same target are interchangeable. Profile
+    // creation, calibration and edits to other targets are ordering barriers.
+    const auto key=controlKey(command);
+    if(!queue.isEmpty()&&!key.isEmpty()&&controlKey(queue.back().command)==key){queue.back()={command,remember};return;}
+    if(queue.size()>=16){lastError=tr("İşlem kuyruğu dolu. Devam etmeden önce işlemlerin bitmesini bekleyin.");Q_EMIT changed();return;}
+    queue.enqueue({command,remember});
     drain();
 }
 void Controller::drain(){
@@ -64,10 +91,14 @@ void Controller::telemetry(){
             if(p[3]==u"rpm"){if(label.contains("cpu"))next["cpu_fan"]=n;else if(label.contains("gpu"))next["gpu_fan"]=n;}
             else if(label.contains("cpu")||(p[1].contains("k10temp")&&label.contains("tctl")))next["cpu_temp"]=n/1000.;else if(label.contains("gpu")||(p[1].contains("amdgpu")&&!next.contains("gpu_temp")))next["gpu_temp"]=n/1000.;
         }}
+        const bool firstSample=!previousTotal&&total>0;
         if(previousTotal&&total>previousTotal&&idle>=previousIdle)next["cpu_usage"]=qBound(0.,100.*(1.-double(idle-previousIdle)/double(total-previousTotal)),100.);
         if(next.contains("nvidia_usage"))next["gpu_usage"]=next.value("nvidia_usage");
         else if(next.contains("amd_usage"))next["gpu_usage"]=next.value("amd_usage");
         previousTotal=total;previousIdle=idle;if(values!=next){values=next;Q_EMIT metricsChanged();}
+        // One bounded follow-up gives an on-demand CPU delta without a
+        // repeating timer. Hidden/destroyed pages cannot perform this read.
+        if(firstSample)QTimer::singleShot(250,this,&Controller::telemetry);
     });
 }
 void Controller::diagnose(const QString& topic){

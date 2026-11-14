@@ -1,0 +1,10 @@
+{
+  "build_type": "MinSizeRel",
+  "sample": "temporary minimal hardware fixture; GUI offscreen/software",
+  "fixture_ui_data_median_ms": 4.009,
+  "fixture_cli_peak_rss_kib": 4968,
+  "gui_fixture_cpu_percent_one_core": 1.0,
+  "gui_fixture_rss_kib": 103888,
+  "gui_fixture_pss_kib": 40375,
+  "gui_fixture_child_count": 0
+}

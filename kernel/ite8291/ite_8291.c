@@ -149,6 +149,7 @@ struct ite8291_driver_data_t {
 	bool color_profile_active;
 	u64 frame_count, brightness_count;
 	int last_error;
+	unsigned int leds_registered;
 	int (*device_add)(struct hid_device *);
 	int (*device_remove)(struct hid_device *);
 	int (*device_write_on)(struct hid_device *);
@@ -388,22 +389,25 @@ static int start_hw(struct hid_device *hdev)
 	result = hid_hw_start(hdev, HID_CONNECT_DEFAULT);
 	if (result) {
 		pr_err("hid_hw_start failed\n");
-		goto err_stop_hw;
+		return result;
 	}
 
-	hid_hw_power(hdev, PM_HINT_FULLON);
+	result = hid_hw_power(hdev, PM_HINT_FULLON);
+	if (result) {
+		hid_hw_stop(hdev);
+		return result;
+	}
 
 	result = hid_hw_open(hdev);
 	if (result) {
 		pr_err("hid_hw_open failed\n");
-		goto err_stop_hw;
+		hid_hw_power(hdev, PM_HINT_NORMAL);
+		hid_hw_stop(hdev);
+		return result;
 	}
 
 	return 0;
 
-err_stop_hw:
-	stop_hw(hdev);
-	return result;
 }
 
 /* Caller owns io_lock. A burst of per-key sysfs writes becomes one USB
@@ -485,7 +489,7 @@ out:
 
 static int register_leds(struct hid_device *hdev)
 {
-	int res, i, j, k, l;
+	int res, i, j;
 	struct ite8291_driver_data_t *ite8291_driver_data = hid_get_drvdata(hdev);
 	struct ite8291_driver_data_perkey_t *device_data = ite8291_driver_data->device_data;
 
@@ -518,28 +522,21 @@ static int register_leds(struct hid_device *hdev)
 			device_data->mcled_cdevs[i][j].subled_info[2].channel = ITE8291_LEDS_PER_ROW_MAX * i + j;
 
 			res = devm_led_classdev_multicolor_register(&hdev->dev, &device_data->mcled_cdevs[i][j]);
-			if (res) {
-				for (k = 0; k <= i; ++k) {
-					for (l = 0; l <= j; ++l) {
-						devm_led_classdev_multicolor_unregister(&hdev->dev, &device_data->mcled_cdevs[i][j]);
-					}
-				}
-				return res;
-			}
+			if (res) return res;
+			ite8291_driver_data->leds_registered++;
 		}
 	}
 	return 0;
 }
 
 static void unregister_leds(struct hid_device *hdev) {
-	int i, j;
 	struct ite8291_driver_data_t *ite8291_driver_data = hid_get_drvdata(hdev);
 	struct ite8291_driver_data_perkey_t *device_data = ite8291_driver_data->device_data;
 
-	for (i = 0; i < ITE8291_NR_ROWS; ++i) {
-		for (j = 0; j < ITE8291_LEDS_PER_ROW_MAX; ++j) {
-			devm_led_classdev_multicolor_unregister(&hdev->dev, &device_data->mcled_cdevs[i][j]);
-		}
+	while (ite8291_driver_data->leds_registered) {
+		unsigned int index = --ite8291_driver_data->leds_registered;
+		devm_led_classdev_multicolor_unregister(&hdev->dev,
+			&device_data->mcled_cdevs[index / ITE8291_LEDS_PER_ROW_MAX][index % ITE8291_LEDS_PER_ROW_MAX]);
 	}
 }
 
@@ -633,7 +630,7 @@ static int ite8291_zones_add(struct hid_device *hdev)
 {
 	struct ite8291_driver_data_t *driver_data;
 	struct ite8291_driver_data_zones_t *zones_data;
-	int result, i, k;
+	int result, i;
 
 	driver_data = hid_get_drvdata(hdev);
 
@@ -661,11 +658,8 @@ static int ite8291_zones_add(struct hid_device *hdev)
 		zones_data->mcled_cdevs[i].subled_info[2].channel = i;
 
 		result = devm_led_classdev_multicolor_register(&hdev->dev, &zones_data->mcled_cdevs[i]);
-		if (result) {
-			for (k = 0; k < i; ++k)
-				devm_led_classdev_multicolor_unregister(&hdev->dev, &zones_data->mcled_cdevs[k]);
-			return result;
-		}
+		if (result) return result;
+		driver_data->leds_registered++;
 	}
 
 	return 0;
@@ -673,12 +667,12 @@ static int ite8291_zones_add(struct hid_device *hdev)
 
 static int ite8291_zones_remove(struct hid_device *hdev)
 {
-	int i;
 	struct ite8291_driver_data_t *ite8291_driver_data = hid_get_drvdata(hdev);
 	struct ite8291_driver_data_zones_t *zones_data = ite8291_driver_data->device_data;
 
-	for (i = 0; i < ITE8291_NR_ZONES; ++i)
-		devm_led_classdev_multicolor_unregister(&hdev->dev, &zones_data->mcled_cdevs[i]);
+	while (ite8291_driver_data->leds_registered)
+		devm_led_classdev_multicolor_unregister(&hdev->dev,
+			&zones_data->mcled_cdevs[--ite8291_driver_data->leds_registered]);
 
 	return 0;
 }
@@ -1015,7 +1009,6 @@ static int driver_probe_callb(struct hid_device *hdev, const struct hid_device_i
 	result = hid_parse(hdev);
 	if (result) {
 		pr_err("hid_parse failed\n");
-		stop_hw(hdev);
 		return result;
 	}
 
@@ -1024,8 +1017,10 @@ static int driver_probe_callb(struct hid_device *hdev, const struct hid_device_i
 		return result;
 
 	ite8291_driver_data = devm_kzalloc(&hdev->dev, sizeof(*ite8291_driver_data), GFP_KERNEL);
-	if (!ite8291_driver_data)
+	if (!ite8291_driver_data) {
+		stop_hw(hdev);
 		return -ENOMEM;
+	}
 
 	hid_set_drvdata(hdev, ite8291_driver_data);
 	mutex_init(&ite8291_driver_data->io_lock);
@@ -1037,29 +1032,34 @@ static int driver_probe_callb(struct hid_device *hdev, const struct hid_device_i
 
 	result = ite8291_driver_data_setup(hdev);
 	if (result != 0)
-		return result;
+		goto fail;
 
 	result = ite8291_driver_data->device_add(hdev);
 	if (result != 0)
-		return result;
+		goto fail;
 
-	ite8291_driver_data->device_write_on(hdev);
-	ite8291_driver_data->device_write_state(hdev);
+	mutex_lock(&ite8291_driver_data->io_lock);
+	result = ite8291_driver_data->device_write_on(hdev);
+	if (!result) result = ite8291_driver_data->device_write_state(hdev);
+	mutex_unlock(&ite8291_driver_data->io_lock);
+	if (result) goto fail;
 
 	if (ite8291_driver_data->device_has_buffer_input_control) {
 		result = sysfs_create_group(&hdev->dev.kobj, &control_group);
-		if (result != 0) {
-			mutex_lock(&ite8291_driver_data->io_lock);
-			ite8291_driver_data->stopping = true;
-			mutex_unlock(&ite8291_driver_data->io_lock);
-			cancel_delayed_work_sync(&ite8291_driver_data->frame_work);
-			ite8291_driver_data->device_remove(hdev);
-			stop_hw(hdev);
-			return result;
-		}
+		if (result != 0) goto fail;
 	}
 
 	return 0;
+fail:
+	mutex_lock(&ite8291_driver_data->io_lock);
+	ite8291_driver_data->stopping = true;
+	mutex_unlock(&ite8291_driver_data->io_lock);
+	/* Stop queued frames before devres can release partially registered LEDs. */
+	cancel_delayed_work_sync(&ite8291_driver_data->frame_work);
+	if (ite8291_driver_data->leds_registered)
+		ite8291_driver_data->device_remove(hdev);
+	stop_hw(hdev);
+	return result;
 }
 
 static void driver_remove_callb(struct hid_device *hdev)

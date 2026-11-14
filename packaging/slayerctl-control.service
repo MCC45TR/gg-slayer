@@ -14,7 +14,9 @@ RuntimeDirectoryPreserve=yes
 NoNewPrivileges=yes
 ProtectSystem=strict
 ReadWritePaths=/etc/slayerctl /run/lock /run/slayerctl /sys
-ProtectHome=yes
+ProtectHome=tmpfs
+# The bridge drops privileges before connecting to the active user's bus.
+BindReadOnlyPaths=-/run/user
 PrivateTmp=yes
 RestrictAddressFamilies=AF_UNIX AF_NETLINK
 LockPersonality=yes

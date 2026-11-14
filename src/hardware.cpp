@@ -305,11 +305,17 @@ void gpu(const Io &io,const std::vector<std::string>&a) {
 }
 void fan(const Io &io,const std::vector<std::string>&a) {
     if(a.empty()||(a.size()==1&&a[0]=="status")) {sensors(io);std::cout<<"Mod: "<<get(io,platform+"/fan_mode")<<'\n';return;}
-    if(a.size()==1&&contains({"auto","boost"},a[0])) {
+    if(a.size()==1&&a[0]=="mode"){
+        const auto mode=get(io,platform+"/fan_mode");
+        if(!contains({"auto","boost","firmware-custom"},mode))throw Error("Fan modu okunamadı.",4);
+        std::cout<<mode<<'\n';return;
+    }
+    if(a.size()==1&&contains({"auto","boost","toggle"},a[0])) {
         if(!io.exists(platform+"/fan_mode"))unverified("Fan modu");
-        if(!contains(words(get(io,platform+"/fan_modes_available")),a[0]))throw Error("Kernel bu fan modunu bildirmiyor.",4);
         auto old=get(io,platform+"/fan_mode");if(!contains({"auto","boost"},old))throw Error("Firmware özel fan modunda; önce profile set balanced veya performance ile fabrika modunu seçin.",4);
-        semanticWrite(io,platform+"/fan_mode",a[0],old,"thermal");std::cout<<"Fan modu: "<<a[0]<<'\n';return;
+        const auto target=a[0]=="toggle"?(old=="boost"?"auto":"boost"):a[0];
+        if(!contains(words(get(io,platform+"/fan_modes_available")),target))throw Error("Kernel bu fan modunu bildirmiyor.",4);
+        semanticWrite(io,platform+"/fan_mode",target,old,"thermal");std::cout<<"Fan modu: "<<target<<'\n';return;
     }
     if(a[0]=="curve"){fanCurve(io,{a.begin()+1,a.end()});return;}
     if(a[0]=="set")unverified("Manuel fan hızı");

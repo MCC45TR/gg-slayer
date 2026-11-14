@@ -130,8 +130,13 @@ public:
         calibrationClients.setConnection(QDBusConnection::sessionBus());calibrationClients.setWatchMode(QDBusServiceWatcher::WatchForUnregistration);
         connect(&calibrationClients,&QDBusServiceWatcher::serviceUnregistered,this,[this](const QString& sender){releaseCalibration(sender,false);});
         QDBusConnection::systemBus().connect(service,path,service,"SessionSettingsChanged",this,SLOT(Reload()));
-        root.setConnection(QDBusConnection::systemBus());root.setWatchedServices({service});root.setWatchMode(QDBusServiceWatcher::WatchForRegistration);
-        connect(&root,&QDBusServiceWatcher::serviceRegistered,this,[this]{Reload();});
+        root.setConnection(QDBusConnection::systemBus());root.setWatchedServices({service});root.setWatchMode(QDBusServiceWatcher::WatchForOwnerChange);
+        connect(&root,&QDBusServiceWatcher::serviceOwnerChanged,this,[this](const QString&,const QString& previous,const QString& current){
+            // A brightness lease belongs to one broker instance. Terminating
+            // this session makes measurement clients stop on service loss.
+            if(!previous.isEmpty()&&!calibrations.isEmpty()){QCoreApplication::quit();return;}
+            if(!current.isEmpty())Reload();
+        });
         QTimer::singleShot(0,this,&Session::Reload);
     }
     ~Session() override {updateKeyboardPolicy(false);}
@@ -186,7 +191,8 @@ public Q_SLOTS:
             QDBusPendingReply<QVariantMap> result=*pending;pending->deleteLater();reloading=false;
             if(reloadPending){reloadPending=false;QTimer::singleShot(0,this,&Session::Reload);}
             if(result.isError()){updateKeyboardPolicy(false);error=result.error().message();armed=false;isIdle=false;if(calibrations.isEmpty())exitTimer.start(5200);return;}
-            const auto cfg=result.value();const bool wasEnabled=enabled;
+            const auto cfg=result.value();
+            if(cfg.value("loading").toBool()){exitTimer.stop();return;}
             enabled=cfg.value("enabled").toBool();const unsigned timeout=cfg.value("timeout",30).toUInt();
             owner(cfg.value("lightingOwner").toString());
             armed=calibrations.isEmpty()&&cfg.value("armed").toBool();
@@ -197,9 +203,13 @@ public Q_SLOTS:
             // This policy affects only automatic keyboard dimming. Hold it while
             // asleep or explicitly off too, so KDE cannot restore a stale level.
             updateKeyboardPolicy(enabled&&cfg.value("powerSaver").toBool()&&cfg.value("available").toBool());
-            if(enabled||!calibrations.isEmpty()){
+            if(keyboardPolicyWanted||!calibrations.isEmpty()){
                 exitTimer.stop();QDBusConnection::systemBus().asyncCall(QDBusMessage::createMethodCall(service,path,service,"Subscribe"));
-            }else exitTimer.start(wasEnabled?5200:2500);
+            }else{
+                auto unsubscribe=QDBusMessage::createMethodCall(service,path,service,"Unsubscribe");unsubscribe.setAutoStartService(false);
+                QDBusConnection::systemBus().asyncCall(unsubscribe);
+                if(!exitTimer.isActive())exitTimer.start(2500);
+            }
         });
     }
     QVariantMap Status(){return {{"enabled",enabled},{"armed",armed},{"idle",isIdle},{"timeout",seconds},{"calibrating",!calibrations.isEmpty()},{"backend",backend},{"keyboardIdleDelegated",keyboardPolicyCookie!=0},{"error",error.isEmpty()?keyboardPolicyError:error}};}

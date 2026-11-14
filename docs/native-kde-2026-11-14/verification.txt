@@ -1,0 +1,12 @@
+Native camera and battery verification, 2026-11-14
+Plasma 6.8.2 / Qt 6.12.0 / systemd 262 / Fedora Rawhide 46
+- CMake MinSizeRel GUI, KCM, Desktop build: passed, no compiler warnings
+- camera applet metadata and qmllint: 2 files, 0 failed
+- BatteryLimit.qml qmllint: passed
+- staged binary QML module load: passed
+- RPM payload paths, permissions, helper identity, existing config preservation: passed
+- git diff --check: passed
+- camera current state: 1; sd-device event monitoring: true; busy: false
+- no hardware writes performed in validation
+- user panel and installed packages unchanged
+- headless/offscreen platform/shadow and initial event-filter warnings are environment limitations

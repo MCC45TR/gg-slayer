@@ -26,5 +26,6 @@ int main(int argc,char** argv){
     if(mapper.decorate(key(u"Enter"_s))[u"h"_s].toDouble()!=1)return 16;
     if(mapper.decorate(key(u"ISO"_s))[u"present"_s].toBool())return 17;
     mapper.setFormat(u"iso"_s,false);
+    if(mapper.decorate(key(u"Menu"_s))[u"label"_s].toString()!=u"Copilot"_s)return 18;
     std::cout<<"TR-Q, TR-F, US, remapped Caps/Escape, group switch and geometry passed; no input device opened.\n";
 }

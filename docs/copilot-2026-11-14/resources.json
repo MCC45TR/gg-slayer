@@ -1,0 +1,11 @@
+{
+  "build": "MinSizeRel",
+  "mode": "fresh preferences, GUI fixture, offscreen/software, overview",
+  "sample_seconds": 5.0,
+  "clock_ticks_per_second": 100,
+  "cpu_ticks": 0,
+  "cpu_percent_one_core": 0.0,
+  "rss_kib": 105004,
+  "pss_kib": 40061,
+  "children": 0
+}

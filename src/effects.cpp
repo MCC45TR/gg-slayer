@@ -53,6 +53,7 @@ public:
             io.write(entry.path+"/brightness",entry.brightness+"\n");
             if(trim(io.read(entry.path+"/brightness"))!=entry.brightness)okay=false;
         }catch(...){okay=false;}
+        try{transaction.restoreEffect();}catch(...){okay=false;}
         pending=!okay;
         return okay;
     }

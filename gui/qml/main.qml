@@ -18,7 +18,7 @@ Kirigami.ApplicationWindow {
     Timer { id: savedTimer; interval: 1800; onTriggered: root.saved = false }
     readonly property var destinations: [qsTr("Genel Bakış"), qsTr("Klavye ve RGB"), qsTr("Güç ve Pil"), qsTr("Performans ve Grafik"), qsTr("Aygıtlar"), qsTr("Otomasyon"), qsTr("Destek")]
     readonly property var icons: ["view-grid", "input-keyboard", "battery", "speedometer", "preferences-devices", "system-run", "help-about"]
-    readonly property bool foreground: visible && visibility !== Window.Minimized
+    readonly property bool foreground: visible && visibility !== Window.Minimized && active
     Binding { target: control; property: "active"; value: root.foreground }
     Binding { target: control; property: "monitoring"; value: root.foreground && root.section === 0 }
     globalDrawer: Kirigami.GlobalDrawer {
@@ -65,6 +65,7 @@ Kirigami.ApplicationWindow {
             }
             QQC2.ScrollView {
                 id: scroll
+                objectName: "pageScroll"
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 contentWidth: availableWidth

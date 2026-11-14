@@ -14,6 +14,6 @@ with tempfile.TemporaryDirectory(prefix='slayer-qml-') as directory:
     errors = [line for line in result.stderr.splitlines() if 'qrc:/ui/' in line or 'Binding loop' in line or 'ReferenceError' in line or 'TypeError' in line]
     assert not errors, '\n'.join(errors)
     captures = list(Path(directory).glob('*.png'))
-    assert len(captures) == 56, len(captures)
+    assert len(captures) == 64, len(captures)
     assert all(file.stat().st_size > 4000 for file in captures)
 print('Seven Kirigami pages at six sizes; no QML load/binding errors; hardware access disabled.')

@@ -31,7 +31,8 @@ qint64 InternalKeyboard::lastActivity(){
     return ok?value:-1;
 }
 void InternalKeyboard::setIdle(bool value){
-    if(dimmed==value)return;dimmed=value;Q_EMIT idleChanged(value);Q_EMIT statusChanged();
+    if(dimmed==value)return;
+    dimmed=value;Q_EMIT idleChanged(value);Q_EMIT statusChanged();
 }
 void InternalKeyboard::fail(const QString& message){stop();lastError=message;Q_EMIT statusChanged();}
 void InternalKeyboard::stop(){
@@ -41,6 +42,7 @@ void InternalKeyboard::stop(){
     fd=-1;running=false;setIdle(false);
 }
 void InternalKeyboard::configure(bool enabled,unsigned timeout){
+    if(!enabled&&!running&&seconds==timeout&&lastError.isEmpty())return;
     if(enabled&&running){
         if(seconds!=timeout){seconds=timeout;evaluate();Q_EMIT statusChanged();}
         return;

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 #include "command.hpp"
+#include "command_queue.hpp"
 #include "idle_dimmer.hpp"
 #include "internal_keyboard.hpp"
 #include "../src/controls.hpp"
@@ -15,6 +16,8 @@
 #include <QDBusInterface>
 #include <QDBusArgument>
 #include <QDBusReply>
+#include <QDBusPendingCallWatcher>
+#include <QDBusPendingReply>
 #include <QFileSystemWatcher>
 #include <QProcess>
 #include <QSocketNotifier>
@@ -25,17 +28,24 @@
 #include <sys/socket.h>
 #include <unistd.h>
 #include <systemd/sd-login.h>
+#include <memory>
 
 class Service final:public QObject,protected QDBusContext {
     Q_OBJECT
     Q_CLASSINFO("D-Bus Interface","org.gamegaraj.Slayer1")
-    QTimer idle,debounce;
+    CommandQueue commands;
+    QTimer idle,debounce,settingsDebounce;
     QFileSystemWatcher files;
     QString cached;
+    quint64 stateVersion=0;
+    void invalidateState(){++stateVersion;cached.clear();}
     QSet<QString> subscribers;
     QDBusServiceWatcher clients;
     int socketFd=-1;
     bool authorizing=false;
+    bool settingsLoading=false,settingsPending=false,syncRunning=false;
+    bool powerLoading=false,powerPending=false;
+    quint64 powerVersion=0;
     bool syncEnabled=false;
     IdleDimmer dimmer;
     InternalKeyboard keyboardActivity;
@@ -45,16 +55,43 @@ class Service final:public QObject,protected QDBusContext {
     QString settingsError;
     unsigned idleTimeout=30;
     std::map<std::string,std::string> settings;
+    struct SettingsResult {std::map<std::string,std::string> values;QString error;};
+    static SettingsResult loadSettings(){
+        try{return {slayer::configurationValues(slayer::Io({})),{}};}
+        catch(const std::exception& e){return {{},QString::fromStdString(slayer::displayText(e.what()))};}
+    }
+    bool background(std::function<CommandResult()> work,std::function<void(CommandResult)> done){
+        const bool queued=commands.run(std::move(work),[this,done=std::move(done)](CommandResult result){done(std::move(result));touch();if(settingsPending&&!settingsLoading){settingsPending=false;reloadSync();}reconcile();});
+        if(queued)idle.stop();
+        return queued;
+    }
+    void finishAuthorization(){
+        authorizing=false;touch();
+        if(settingsPending&&!settingsLoading){settingsPending=false;reloadSync();}
+        reconcile();
+    }
     static constexpr auto powerService="org.freedesktop.UPower.PowerProfiles";
     void readPower(){
-        QDBusInterface props(powerService,"/org/freedesktop/UPower/PowerProfiles","org.freedesktop.DBus.Properties",QDBusConnection::systemBus());props.setTimeout(2000);
-        QDBusReply<QVariantMap> result=props.call("GetAll",powerService);
-        powerAvailable=result.isValid();desktopChoices.clear();desktopProfile.clear();
-        if(powerAvailable){
-            desktopProfile=result.value().value("ActiveProfile").toString();
-            const auto array=qvariant_cast<QDBusArgument>(result.value().value("Profiles"));
-            array.beginArray();while(!array.atEnd()){QVariantMap profile;array>>profile;desktopChoices.append(profile.value("Profile").toString());}array.endArray();
-        }
+        if(powerLoading){powerPending=true;return;}
+        powerLoading=true;
+        const auto generation=powerVersion;
+        auto request=QDBusMessage::createMethodCall(powerService,"/org/freedesktop/UPower/PowerProfiles","org.freedesktop.DBus.Properties","GetAll");
+        request<<QString::fromLatin1(powerService);
+        auto* pending=new QDBusPendingCallWatcher(QDBusConnection::systemBus().asyncCall(request,2000),this);
+        connect(pending,&QDBusPendingCallWatcher::finished,this,[this,pending,generation]{
+            QDBusPendingReply<QVariantMap> result=*pending;pending->deleteLater();powerLoading=false;
+            if(generation!=powerVersion){if(powerPending){powerPending=false;readPower();}return;}
+            powerAvailable=!result.isError();desktopChoices.clear();desktopProfile.clear();
+            if(powerAvailable){
+                desktopProfile=result.value().value("ActiveProfile").toString();
+                const auto array=qvariant_cast<QDBusArgument>(result.value().value("Profiles"));
+                array.beginArray();while(!array.atEnd()){QVariantMap profile;array>>profile;desktopChoices.append(profile.value("Profile").toString());}array.endArray();
+            }
+            refreshActivity();
+            if(desktopProfile=="power-saver"&&idleEnabled)activateSession();
+            Q_EMIT SessionSettingsChanged();changed();
+            if(powerPending){powerPending=false;readPower();}
+        });
     }
     bool activeUser(const QString& sender){
         const auto uid=QDBusConnection::systemBus().interface()->serviceUid(sender);
@@ -74,14 +111,24 @@ class Service final:public QObject,protected QDBusContext {
         touch();
     }
     void releaseIdle(){
+        if(!idleOwner.isEmpty()&&!subscribers.contains(idleOwner))clients.removeWatchedService(idleOwner);
         idleOwner.clear();
         if(asleep)dimmer.reset();else dimmer.fade(false);
         refreshActivity();
     }
-    void activateSession(){QProcess::startDetached("/usr/libexec/slayerctl-desktop",{"--reload-session"});}
+    void activateSession(){
+        const auto owner=settings.find("lighting_owner");
+        const bool palette=owner!=settings.end()&&(owner->second=="accent"||owner->second=="custom");
+        if(palette||(idleEnabled&&desktopProfile=="power-saver"))QProcess::startDetached("/usr/libexec/slayerctl-desktop",{"--reload-session"});
+    }
     QString syncOrigin,syncError,expectedDesktop,expectedHardware;
-    void reloadSync(){
-        try{settings=slayer::configurationValues(slayer::Io({}));settingsError.clear();}catch(const slayer::Error& e){settings.clear();settingsError=QString::fromStdString(slayer::displayText(e.what()));}
+    void useSettings(SettingsResult loaded){
+        const auto before=settings.find("lighting_owner");
+        const auto after=loaded.values.find("lighting_owner");
+        const bool ownerChanged=(before==settings.end())!=(after==loaded.values.end())||
+            (before!=settings.end()&&after!=loaded.values.end()&&before->second!=after->second);
+        const bool wasIdleEnabled=idleEnabled;
+        settings=std::move(loaded.values);settingsError=std::move(loaded.error);invalidateState();
         const bool enabled=settings.contains("performance_sync")&&settings.at("performance_sync")=="on";
         idleEnabled=settings.contains("keyboard_idle_dim")&&settings.at("keyboard_idle_dim")=="on";
         idleTimeout=settings.contains("keyboard_idle_timeout")?unsigned(std::stoi(settings.at("keyboard_idle_timeout"))):30u;
@@ -93,21 +140,34 @@ class Service final:public QObject,protected QDBusContext {
         if(newlyEnabled)syncOrigin="hardware";
         touch();
         Q_EMIT SessionSettingsChanged();
+        if(ownerChanged||(!wasIdleEnabled&&idleEnabled))activateSession();
+    }
+    void reloadSync(){
+        if(settingsLoading){settingsPending=true;return;}
+        settingsLoading=true;
+        auto loaded=std::make_shared<SettingsResult>();
+        if(!background([loaded]{*loaded=loadSettings();return CommandResult{true,{}};},[this,loaded](CommandResult){
+            settingsLoading=false;useSettings(std::move(*loaded));reconcile();
+            if(settingsPending){settingsPending=false;reloadSync();}
+        })) {settingsLoading=false;settingsPending=true;}
     }
     void reconcile(){
-        if(!syncEnabled||syncOrigin.isEmpty())return;
+        if(!syncEnabled||syncOrigin.isEmpty()||syncRunning||authorizing)return;
         const bool fromHardware=syncOrigin=="hardware";syncOrigin.clear();
         slayer::Io io({});
         if(fromHardware){
             try{expectedDesktop=QString::fromStdString(slayer::desktopForHardware(slayer::trim(io.read(slayer::hardwareProfilePath(io)))));}
             catch(const slayer::Error&){expectedDesktop.clear();}
         }
-        auto result=ctlCommand({"profile","sync",fromHardware?"from-hardware":"from-desktop"},true);
-        if(result.ok){
-            syncError.clear();
-            if(!fromHardware)expectedHardware=QString::fromStdString(slayer::trim(io.read(slayer::hardwareProfilePath(io))));
-        }else{syncError=result.output.trimmed();expectedDesktop.clear();expectedHardware.clear();}
-        cached.clear();
+        syncRunning=true;
+        if(!background([fromHardware]{return ctlCommand({"profile","sync",fromHardware?"from-hardware":"from-desktop"},true);},[this,fromHardware](CommandResult result){
+            syncRunning=false;
+            if(result.ok){
+                syncError.clear();
+                if(!fromHardware){slayer::Io live({});expectedHardware=QString::fromStdString(slayer::trim(live.read(slayer::hardwareProfilePath(live))));}
+            }else{syncError=result.output.trimmed();expectedDesktop.clear();expectedHardware.clear();}
+            invalidateState();Q_EMIT StateChanged();reconcile();
+        })){syncRunning=false;syncOrigin=fromHardware?"hardware":"desktop";}
     }
     void hardwareChanged(){
         slayer::Io io({});
@@ -116,28 +176,33 @@ class Service final:public QObject,protected QDBusContext {
         else {expectedHardware.clear();syncOrigin="hardware";}
         changed();
     }
-    void touch(){if(subscribers.isEmpty()&&!authorizing&&!syncEnabled&&!keyboardActivity.active())idle.start(30000);else idle.stop();}
-    QString state(){
-        auto r=ctlCommand({"ui-data"});if(!r.ok)return {};
+    void touch(){if(subscribers.isEmpty()&&!authorizing&&!commands.pending()&&!syncEnabled&&!idleEnabled&&idleOwner.isEmpty())idle.start(5000);else idle.stop();}
+    QString state(CommandResult r){
+        if(!r.ok)return {};
         for(const auto& [key,value]:settings)r.output+="value\tsaved_"+QString::fromStdString(key)+"\t"+QString::fromStdString(slayer::displayText(value))+"\n";
         if(!settingsError.isEmpty())r.output+="value\tconfig_error\t"+settingsError+"\n";
         r.output+="value\tdesktop_profile\t"+desktopProfile+"\nvalue\tdesktop_choices\t"+desktopChoices.join(u' ')+"\nvalue\tdesktop_available\t"+(powerAvailable?"1":"0")+"\n";
         r.output+="value\tkeyboard_idle_available\t"+(dimmer.available()&&keyboardActivity.available()?QString("1"):QString("0"))+"\n";
         if(!keyboardActivity.error().isEmpty())r.output+="value\tkeyboard_idle_error\t"+keyboardActivity.error()+"\n";
         if(!syncError.isEmpty())r.output+="value\tperformance_sync_error\t"+QString::fromStdString(slayer::displayText(syncError.toStdString()))+"\n";
-        cached=r.output;return cached;
+        return r.output;
     }
-    void changed(){cached.clear();debounce.start(150);}
+    void changed(){invalidateState();debounce.start(150);}
 public:
     Service(){
         connect(&keyboardActivity,&InternalKeyboard::idleChanged,this,[this](bool value){dimmer.fade(value);});
-        connect(&keyboardActivity,&InternalKeyboard::statusChanged,this,[this]{cached.clear();Q_EMIT SessionSettingsChanged();});
+        connect(&keyboardActivity,&InternalKeyboard::statusChanged,this,[this]{invalidateState();Q_EMIT SessionSettingsChanged();});
         clients.setConnection(QDBusConnection::systemBus());clients.setWatchMode(QDBusServiceWatcher::WatchForUnregistration);
         connect(&clients,&QDBusServiceWatcher::serviceUnregistered,this,[this](const QString& name){if(name==idleOwner)releaseIdle();subscribers.remove(name);clients.removeWatchedService(name);touch();});
         idle.setSingleShot(true);connect(&idle,&QTimer::timeout,qApp,&QCoreApplication::quit);touch();
         debounce.setSingleShot(true);connect(&debounce,&QTimer::timeout,this,[this]{reconcile();Q_EMIT StateChanged();});
         for(const auto& p:{"/etc/slayerctl","/etc/slayerctl/rgb-profiles"})if(QFile::exists(p))files.addPath(p);
-        connect(&files,&QFileSystemWatcher::directoryChanged,this,[this]{reloadSync();activateSession();changed();});
+        settingsDebounce.setSingleShot(true);settingsDebounce.setInterval(150);
+        connect(&settingsDebounce,&QTimer::timeout,this,[this]{
+            if(authorizing){settingsPending=true;return;}
+            reloadSync();changed();
+        });
+        connect(&files,&QFileSystemWatcher::directoryChanged,this,[this]{settingsDebounce.start();});
         // Kernel uevents only. Accept no userspace-injected packets as hardware truth.
         socketFd=socket(AF_NETLINK,SOCK_DGRAM|SOCK_NONBLOCK|SOCK_CLOEXEC,NETLINK_KOBJECT_UEVENT);
         sockaddr_nl address{};address.nl_family=AF_NETLINK;address.nl_groups=1;
@@ -157,20 +222,22 @@ public:
         QDBusConnection::systemBus().connect("org.freedesktop.UPower","/org/freedesktop/UPower/KbdBacklight","org.freedesktop.UPower.KbdBacklight","BrightnessChanged",this,SLOT(keyboardBrightnessChanged(int)));
         QDBusConnection::systemBus().connect("org.freedesktop.login1","/org/freedesktop/login1/seat/seat0","org.freedesktop.DBus.Properties","PropertiesChanged",this,SLOT(seatChanged(QString,QVariantMap,QStringList)));
         QDBusConnection::systemBus().connect("org.freedesktop.login1","/org/freedesktop/login1","org.freedesktop.login1.Manager","PrepareForSleep",this,SLOT(prepareForSleep(bool)));
-        QTimer::singleShot(0,this,[this]{readPower();reloadSync();reconcile();activateSession();});
+        QTimer::singleShot(0,this,[this]{readPower();reloadSync();});
     }
-    ~Service()override{keyboardActivity.stop();dimmer.reset();if(socketFd>=0)close(socketFd);}
+    ~Service()override{commands.stop();keyboardActivity.stop();dimmer.reset();if(socketFd>=0)close(socketFd);}
 private Q_SLOTS:
     void seatChanged(const QString&,const QVariantMap& values,const QStringList&){if(values.contains("ActiveSession")){if(!idleOwner.isEmpty()&&!activeUser(idleOwner))releaseIdle();else refreshActivity();}}
     void prepareForSleep(bool sleeping){asleep=sleeping;if(sleeping)releaseIdle();else refreshActivity();Q_EMIT SessionSettingsChanged();}
     void keyboardBrightnessChanged(int){refreshActivity();changed();}
     void powerChanged(const QString& interface,const QVariantMap& values,const QStringList& invalidated){
         if(interface!="org.freedesktop.UPower.PowerProfiles"||(!values.contains("ActiveProfile")&&!invalidated.contains("ActiveProfile")))return;
+        ++powerVersion;
         const auto value=values.value("ActiveProfile").toString();
         desktopProfile=value;powerAvailable=true;
         if(value.isEmpty()||invalidated.contains("ActiveProfile"))readPower();
         if(desktopProfile!="power-saver")dimmer.fade(false);
         refreshActivity();
+        if(desktopProfile=="power-saver"&&idleEnabled)activateSession();
         Q_EMIT SessionSettingsChanged();
         if(!expectedDesktop.isEmpty()&&value==expectedDesktop)expectedDesktop.clear();
         else {expectedDesktop.clear();syncOrigin="desktop";}
@@ -179,7 +246,7 @@ private Q_SLOTS:
 public Q_SLOTS:
     QVariantMap ReadSessionSettings(){
         touch();
-        return {{"enabled",idleEnabled},{"timeout",idleTimeout},{"powerSaver",desktopProfile=="power-saver"},{"sleeping",asleep},
+        return {{"loading",settingsLoading},{"enabled",idleEnabled},{"timeout",idleTimeout},{"powerSaver",desktopProfile=="power-saver"},{"sleeping",asleep},
             {"available",dimmer.available()&&keyboardActivity.available()},{"armed",keyboardActivity.active()},
             {"idle",keyboardActivity.idle()},{"backend",QStringLiteral("internal-keyboard")},{"idleError",keyboardActivity.error()},
             {"lightingOwner",QString::fromStdString(settings.contains("lighting_owner")?settings.at("lighting_owner"):"")}};
@@ -187,9 +254,14 @@ public Q_SLOTS:
     bool PrepareCalibration(){
         if(!calledFromDBus())return false;
         const auto sender=message().service();
-        if(!activeUser(sender)||(!idleOwner.isEmpty()&&idleOwner!=sender))return false;
+        if(!idleOwner.isEmpty()&&idleOwner!=sender)return false;
+        clients.addWatchedService(sender);
+        if(!activeUser(sender)){
+            if(!subscribers.contains(sender)&&sender!=idleOwner)clients.removeWatchedService(sender);
+            return false;
+        }
         // Older drivers have no transient scale and need no fade barrier.
-        if(!dimmer.available())return true;
+        if(!dimmer.available()){if(!subscribers.contains(sender))clients.removeWatchedService(sender);return true;}
         idleOwner=sender;clients.addWatchedService(sender);
         keyboardActivity.configure(false,idleTimeout);
         const auto request=message();setDelayedReply(true);
@@ -202,18 +274,51 @@ public Q_SLOTS:
         if(!calledFromDBus()||message().service()!=idleOwner)return false;
         releaseIdle();Q_EMIT SessionSettingsChanged();return true;
     }
-    void Subscribe(){if(!calledFromDBus()||subscribers.size()>=16)return;const auto sender=message().service();subscribers.insert(sender);clients.addWatchedService(sender);touch();}
+    void Subscribe(){
+        if(!calledFromDBus()||subscribers.size()>=16)return;
+        const auto sender=message().service();clients.addWatchedService(sender);
+        const auto alive=QDBusConnection::systemBus().interface()->isServiceRegistered(sender);
+        if(!alive.isValid()||!alive.value()){if(sender!=idleOwner)clients.removeWatchedService(sender);return;}
+        subscribers.insert(sender);touch();
+    }
     void Unsubscribe(){if(!calledFromDBus())return;const auto sender=message().service();subscribers.remove(sender);if(sender!=idleOwner)clients.removeWatchedService(sender);touch();}
-    QString ReadState(){touch();return cached.isEmpty()?state():cached;}
-    QString ReadTelemetry(){touch();return ctlCommand({"telemetry"}).output;}
+    QString ReadState(){
+        touch();if(!cached.isEmpty())return cached;
+        if(!calledFromDBus())return {};
+        const auto request=message();const auto generation=stateVersion;setDelayedReply(true);
+        if(!background([]{return ctlCommand({"ui-data"});},[this,request,generation](CommandResult result){
+            if(!result.ok){QDBusConnection::systemBus().send(request.createErrorReply("org.gamegaraj.Slayer1.Failed",result.output));return;}
+            // Events may arrive while the worker reads sysfs; do not cache a
+            // result that could precede an already processed hardware event.
+            const auto output=state(std::move(result));
+            if(generation==stateVersion)cached=output;
+            QDBusConnection::systemBus().send(request.createReply(QVariantList{output}));
+        }))QDBusConnection::systemBus().send(request.createErrorReply("org.gamegaraj.Slayer1.Busy","İşlem kuyruğu dolu."));
+        return {};
+    }
+    QString ReadTelemetry(){
+        touch();if(!calledFromDBus())return {};
+        const auto request=message();setDelayedReply(true);
+        if(!background([]{return ctlCommand({"telemetry"});},[request](CommandResult result){
+            QDBusConnection::systemBus().send(result.ok?request.createReply(QVariantList{result.output}):request.createErrorReply("org.gamegaraj.Slayer1.Failed",result.output));
+        }))
+            QDBusConnection::systemBus().send(request.createErrorReply("org.gamegaraj.Slayer1.Busy","İşlem kuyruğu dolu."));
+        return {};
+    }
     QString Diagnose(const QString& topic){
         touch();
-        if(topic.startsWith("profile:"))return ctlCommand({"keyboard","profile","show",topic.mid(8)}).output;
-        if(topic=="gpu-limits")return ctlCommand({"gpu","limits"}).output;
-        if(topic=="cpu-topology")return ctlCommand({"cpu","topology"}).output;
-        if(topic=="fan-curves")return ctlCommand({"fan","curve","list"}).output;
-        if(!QStringList{"doctor","sensors","capabilities","info"}.contains(topic))return "Geçersiz tanılama konusu.";
-        return ctlCommand({topic}).output;
+        if(!calledFromDBus()||topic.size()>64)return "Geçersiz tanılama konusu.";
+        QStringList args;
+        if(topic.startsWith("profile:"))args={"keyboard","profile","show",topic.mid(8)};
+        else if(topic=="gpu-limits")args={"gpu","limits"};
+        else if(topic=="cpu-topology")args={"cpu","topology"};
+        else if(topic=="fan-curves")args={"fan","curve","list"};
+        else if(QStringList{"doctor","sensors","capabilities","info"}.contains(topic))args={topic};
+        else return "Geçersiz tanılama konusu.";
+        const auto request=message();setDelayedReply(true);
+        if(!background([args]{return ctlCommand(args);},[request](CommandResult result){QDBusConnection::systemBus().send(request.createReply(QVariantList{result.output}));}))
+            QDBusConnection::systemBus().send(request.createErrorReply("org.gamegaraj.Slayer1.Busy","İşlem kuyruğu dolu."));
+        return {};
     }
     QString Apply(const QStringList& command,const QStringList& remember){
         touch();if(!calledFromDBus())return {};
@@ -225,45 +330,33 @@ public Q_SLOTS:
         auto* deadline=new QTimer(check);deadline->setSingleShot(true);connect(deadline,&QTimer::timeout,check,&QProcess::kill);deadline->start(60000);
         // Identity is the bus sender, never a client-supplied PID/user/group.
         connect(check,qOverload<int,QProcess::ExitStatus>(&QProcess::finished),this,[this,check,request,command,remember](int code,QProcess::ExitStatus status){
-            authorizing=false;touch();check->deleteLater();
-            if(code!=0||status!=QProcess::NormalExit){QDBusConnection::systemBus().send(request.createErrorReply("org.gamegaraj.Slayer1.NotAuthorized","Yönetici doğrulaması tamamlanmadı."));return;}
-            if(!remember.isEmpty()){
-                QStringList validate{"--dry-run","config","set"};validate.append(remember);
-                auto validated=ctlCommand(validate,true);
-                if(!validated.ok){QDBusConnection::systemBus().send(request.createErrorReply("org.gamegaraj.Slayer1.InvalidSetting",validated.output));return;}
-            }
-            // Preflight TPM before touching hardware; never fall back to plaintext.
-            auto result=command==QStringList{"config","recover"}?CommandResult{true,{}}:ctlCommand({"config","protect"},true);
-            if(result.ok)result=ctlCommand(command,true);
-            // Preserve the last working lighting state without overwriting named profiles.
-            QStringList savedSettings=remember;
-            if(result.ok&&command.value(0)=="keyboard"&&QStringList{"color","key","hardware"}.contains(command.value(1))){
-                QStringList snapshot{"keyboard","profile","snapshot","__slayer_current"};
-                if(command.value(1)=="hardware"){
-                    QString speed="5",brightness="50",direction="right";
-                    for(int i=3;i+1<command.size();i+=2){if(command[i]=="--speed")speed=command[i+1];if(command[i]=="--brightness")brightness=command[i+1];if(command[i]=="--direction")direction=command[i+1];}
-                    snapshot={"keyboard","profile","snapshot-effect","__slayer_current",command.value(2),speed,brightness,direction};
+            check->deleteLater();
+            if(code!=0||status!=QProcess::NormalExit){finishAuthorization();QDBusConnection::systemBus().send(request.createErrorReply("org.gamegaraj.Slayer1.NotAuthorized","Yönetici doğrulaması tamamlanmadı."));return;}
+            auto loaded=std::make_shared<SettingsResult>();
+            if(!background([command,remember,loaded]{
+                auto result=applyCommand(command,remember);
+                *loaded=loadSettings();
+                const auto& config=loaded->values;
+                if(result.ok&&config.contains("performance_sync")&&config.at("performance_sync")=="on"&&
+                   (command.value(0)=="power"||command.value(0)=="profile")){
+                    auto synced=ctlCommand({"profile","sync",command.value(0)=="power"?"from-desktop":"from-hardware"},true);
+                    if(!synced.ok)result={false,"Ayar değişti fakat eşitleme tamamlanmadı: "+synced.output};
                 }
-                auto saved=ctlCommand(snapshot,true);
-                if(!saved.ok)result={false,"Işık uygulandı fakat son durum hatırlanamadı: "+saved.output};
-                else savedSettings.append({"rgb_profile","__slayer_current"});
-            }
-            if(result.ok&&!savedSettings.isEmpty()){QStringList save{"config","set"};save.append(savedSettings);auto saved=ctlCommand(save,true);if(!saved.ok)result={false,"Ayar uygulandı fakat hatırlanamadı: "+saved.output};}
-            reloadSync();
-            if(result.ok&&command.value(0)=="config")activateSession();
-            if(result.ok&&syncEnabled){
-                if(command.value(0)=="power")syncOrigin="desktop";
-                else if(command.value(0)=="profile")syncOrigin="hardware";
+                return result;
+            },[this,request,command,loaded](CommandResult result){
+                authorizing=false;settingsPending=false;useSettings(std::move(*loaded));
                 reconcile();
-                if(!syncError.isEmpty())result={false,"Ayar değişti fakat eşitleme tamamlanmadı: "+syncError};
+                invalidateState();Q_EMIT StateChanged();
+                if(result.ok)QDBusConnection::systemBus().send(request.createReply(QVariantList{result.output}));
+                else QDBusConnection::systemBus().send(request.createErrorReply("org.gamegaraj.Slayer1.Failed",result.output));
+            })){
+                finishAuthorization();
+                QDBusConnection::systemBus().send(request.createErrorReply("org.gamegaraj.Slayer1.Busy","İşlem kuyruğu dolu."));
             }
-            cached.clear();Q_EMIT StateChanged();
-            if(result.ok)QDBusConnection::systemBus().send(request.createReply(QVariantList{result.output}));
-            else QDBusConnection::systemBus().send(request.createErrorReply("org.gamegaraj.Slayer1.Failed",result.output));
         });
         connect(check,&QProcess::errorOccurred,this,[this,check,request](QProcess::ProcessError error){
             if(error!=QProcess::FailedToStart)return;
-            authorizing=false;touch();check->deleteLater();
+            finishAuthorization();check->deleteLater();
             QDBusConnection::systemBus().send(request.createErrorReply("org.gamegaraj.Slayer1.AuthUnavailable","Kimlik doğrulama aracı başlatılamadı."));
         });
         const bool recover=command==QStringList{"config","recover"};

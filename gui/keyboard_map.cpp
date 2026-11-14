@@ -132,6 +132,9 @@ QVariantMap DesktopKeyboard::decorate(QVariantMap key)const{
     key.insert(u"label"_s,key.value(u"fallbackLabel"_s));key.remove(u"shift"_s);key.remove(u"altgr"_s);
     const auto geometry=shape(key);for(auto it=geometry.begin();it!=geometry.end();++it)key.insert(it.key(),it.value());
     const auto id=key.value(u"id"_s).toString();const auto native=keyName(id);key.insert(u"xkb"_s,native);
+    // Keep the stored LED id "Menu" compatible with existing RGB profiles.
+    // The R9T key cap at this position is Copilot, independent of XKB layout.
+    if(id==u"Menu"){key.insert(u"label"_s,u"Copilot"_s);return key;}
     if(!map||native.isEmpty())return key;
     const auto code=xkb_keymap_key_by_name(map,native.toLatin1().constData());if(code==XKB_KEYCODE_INVALID)return key;
     key.insert(u"scan"_s,code);

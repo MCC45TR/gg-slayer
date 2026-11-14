@@ -179,10 +179,10 @@ KCM.SimpleKCM {
                 QQC2.Label { text: page.reason("battery-limit"); wrapMode: Text.WordWrap; Layout.fillWidth: true }
                 RowLayout {
                     QQC2.Label { text: "Alt (%)" }
-                    QQC2.SpinBox { id: lower; from: 0; to: 95; value: parseInt(kcm.info.battery_start || "60"); editable: true }
-                    QQC2.Label { text: "Üst (%)" }
-                    QQC2.SpinBox { id: upper; from: 50; to: 100; value: parseInt(kcm.info.battery_limit || "80"); editable: true }
-                    QQC2.Button { text: "Uygula"; enabled: page.ready("battery-limit") && lower.value < upper.value && !kcm.busy; onClicked: kcm.run(["battery", "limit", upper.value.toString(), lower.value.toString()], true) }
+                    QQC2.SpinBox { id: lower; from: 0; to: 95; value: parseInt(kcm.info.battery_start || "0"); editable: true; enabled: page.ready("battery-limit") && !!kcm.info.battery_start && !kcm.busy; textFromValue: (value, locale) => !!kcm.info.battery_start ? Number(value).toLocaleString(locale, "f", 0) : "—" }
+                    QQC2.Label { text: "Azami dolum (%)" }
+                    QQC2.SpinBox { id: upper; from: 50; to: 100; value: parseInt(kcm.info.battery_limit || "100"); editable: true; enabled: page.ready("battery-limit") && !kcm.busy; textFromValue: (value, locale) => page.ready("battery-limit") ? Number(value).toLocaleString(locale, "f", 0) : "—" }
+                    QQC2.Button { text: "Uygula"; enabled: page.ready("battery-limit") && (!kcm.info.battery_start || lower.value < upper.value) && !kcm.busy; onClicked: kcm.run(kcm.info.battery_start ? ["battery", "limit", upper.value.toString(), lower.value.toString()] : ["battery", "limit", upper.value.toString()], true) }
                 }
             }
         }
@@ -354,7 +354,7 @@ KCM.SimpleKCM {
                 QQC2.Label { text: "Kaydetmek mevcut ayarı değiştirmez. Seçtiğiniz ayarlar sonraki açılışta bir kez uygulanır; sürekli çalışan servis yoktur."; wrapMode: Text.WordWrap; Layout.fillWidth: true }
                 RowLayout {
                     QQC2.Button { text: "Klavye rengini/parlaklığını kaydet"; enabled: page.ready("rgb") && color.acceptableInput && !kcm.busy; onClicked: kcm.run(["config", "set", "keyboard_color", color.text, "keyboard_brightness", brightness.value.toString()], true) }
-                    QQC2.Button { text: "Pil eşiklerini kaydet"; enabled: page.ready("battery-limit") && lower.value < upper.value && !kcm.busy; onClicked: kcm.run(["config", "set", "battery_end", upper.value.toString(), "battery_start", lower.value.toString()], true) }
+                    QQC2.Button { text: "Pil eşiklerini kaydet"; enabled: page.ready("battery-limit") && (!kcm.info.battery_start || lower.value < upper.value) && !kcm.busy; onClicked: kcm.run(kcm.info.battery_start ? ["config", "set", "battery_end", upper.value.toString(), "battery_start", lower.value.toString()] : ["config", "set", "battery_end", upper.value.toString()], true) }
                 }
                 RowLayout {
                     QQC2.Button { text: "Güç profilini kaydet"; enabled: page.ready("profile") && !kcm.busy; onClicked: kcm.run(["config", "set", "profile", profile.currentText], true) }

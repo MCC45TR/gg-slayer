@@ -1,0 +1,13 @@
+{
+  "command": [
+    "plasmawindowed",
+    "--smoke-test",
+    "org.gamegaraj.slayerctl.camera"
+  ],
+  "exit_code": 0,
+  "platform": "offscreen",
+  "isolated_xdg": true,
+  "hardware_writes": false,
+  "stdout": "",
+  "stderr": "kf.windowsystem: Could not find any platform plugin\nThis plugin does not support propagateSizeHints()\nkf.plasma.quick: Couldn't create KWindowShadow for PlasmaQuick::PlasmaWindow(0x559c7b6fd7b0)\nkf.plasma.quick: Couldn't create KWindowShadow for PlasmaQuick::PlasmaWindow(0x559c7bb68f30)\n"
+}

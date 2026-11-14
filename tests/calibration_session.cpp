@@ -22,13 +22,15 @@ class Core final:public QObject,protected QDBusContext {
     Q_CLASSINFO("D-Bus Interface","org.gamegaraj.Slayer1")
 public:
     int preparations=0;
-    bool reject=false,monitoring=true;
+    bool reject=false,monitoring=true,loading=true,powerSaver=true;
+    int subscriptions=0,unsubscriptions=0;
     QList<bool> notifications;
     QList<QDBusMessage> waiting;
     void finish(){for(const auto& request:std::as_const(waiting))QDBusConnection::sessionBus().send(request.createReply(QVariantList{true}));waiting.clear();}
 public Q_SLOTS:
-    QVariantMap ReadSessionSettings(){return {{"enabled",true},{"timeout",5u},{"powerSaver",true},{"available",true},{"lightingOwner",QStringLiteral("kde")},{"sleeping",false},{"armed",monitoring},{"idle",false},{"backend",QStringLiteral("internal-keyboard")}};}
-    void Subscribe(){}
+    QVariantMap ReadSessionSettings(){return {{"loading",loading},{"enabled",!loading},{"timeout",5u},{"powerSaver",powerSaver},{"available",true},{"lightingOwner",QStringLiteral("kde")},{"sleeping",false},{"armed",monitoring&&powerSaver},{"idle",false},{"backend",QStringLiteral("internal-keyboard")}};}
+    void Subscribe(){++subscriptions;}
+    void Unsubscribe(){++unsubscriptions;}
     bool IdleChanged(bool value){notifications.append(value);return true;}
     bool PrepareCalibration(){++preparations;monitoring=false;Q_EMIT SessionSettingsChanged();if(reject)return false;setDelayedReply(true);waiting.append(message());return false;}
     bool FinishCalibration(){monitoring=true;Q_EMIT SessionSettingsChanged();return true;}
@@ -73,6 +75,10 @@ int main(int argc,char** argv){
     require(bus.registerService("org.kde.Solid.PowerManagement")&&bus.registerObject("/org/kde/Solid/PowerManagement/PolicyAgent",&keyboardPolicy,flags|QDBusConnection::ExportAllProperties),"Private keyboard policy registration");
     QProcess child;auto env=QProcessEnvironment::systemEnvironment();env.insert("DBUS_SYSTEM_BUS_ADDRESS",qEnvironmentVariable("DBUS_SESSION_BUS_ADDRESS"));env.insert("XDG_CURRENT_DESKTOP","KDE");env.remove("WAYLAND_DISPLAY");env.remove("DISPLAY");child.setProcessEnvironment(env);child.start(QString::fromLocal8Bit(argv[1]));require(child.waitForStarted(),"Session process startup");
     require(until([&]{return bus.interface()->isServiceRegistered("org.gamegaraj.Slayer.Session1").value();}),"Session bus name");
+    QElapsedTimer startup;startup.start();
+    require(until([&]{return startup.elapsed()>=2800;}),"Slow settings fixture");
+    require(child.state()==QProcess::Running&&!status(bus).value("armed").toBool(),"Session used defaults or exited during slow TPM load");
+    core.loading=false;Q_EMIT core.SessionSettingsChanged();
     require(until([&]{return status(bus).value("armed").toBool();}),"Idle watch armed");
     require(status(bus).value("backend").toString()==QStringLiteral("internal-keyboard"),"Internal keyboard backend selected");
     require(until([&]{return status(bus).value("keyboardIdleDelegated").toBool();}),"Keyboard policy delegated");
@@ -86,6 +92,12 @@ int main(int argc,char** argv){
     Q_EMIT mutter.WatchFired(mutter.lastIdle);
     QCoreApplication::processEvents(QEventLoop::AllEvents,10);
     require(core.notifications.isEmpty(),"Global desktop input affected keyboard lighting");
+    core.powerSaver=false;Q_EMIT core.SessionSettingsChanged();
+    require(until([&]{return core.unsubscriptions>0&&!status(bus).value("keyboardIdleDelegated").toBool();}),"Inactive session retained its policy/subscription");
+    require(until([&]{return child.state()==QProcess::NotRunning;}),"Session stayed resident outside power saving");
+    core.powerSaver=true;child.start(QString::fromLocal8Bit(argv[1]));require(child.waitForStarted(),"Session restart");
+    require(until([&]{return bus.interface()->isServiceRegistered("org.gamegaraj.Slayer.Session1").value();}),"Restart session bus name");
+    require(until([&]{return status(bus).value("keyboardIdleDelegated").toBool();}),"Active session did not reacquire policy");
     {
         auto a=QDBusConnection::connectToBus(QDBusConnection::SessionBus,"calibration-a");
         auto requestA=send(a,"BeginCalibration");
@@ -122,7 +134,17 @@ int main(int argc,char** argv){
         require(until([&]{return !status(bus).value("calibrating").toBool();}),"Failed preparation retained its lease");
     }
     QDBusConnection::disconnectFromBus("calibration-a");
+    core.reject=false;
+    auto restartClient=QDBusConnection::connectToBus(QDBusConnection::SessionBus,"calibration-restart");
+    const int preparations=core.preparations;
+    auto restartLease=send(restartClient,"BeginCalibration");
+    require(until([&]{return core.preparations==preparations+1;}),"Restart test preparation");
+    core.finish();require(boolean(restartLease),"Restart test lease");
+    require(bus.unregisterService("org.gamegaraj.Slayer1"),"Broker disappearance");
+    require(until([&]{return child.state()==QProcess::NotRunning;}),"Stale calibration survived broker loss");
+    require(until([&]{return !bus.interface()->isServiceRegistered("org.gamegaraj.Slayer.Session1").value();}),"Measurement clients did not lose the invalid lease");
+    QDBusConnection::disconnectFromBus("calibration-restart");
     child.terminate();if(!child.waitForFinished(2000)){child.kill();child.waitForFinished(2000);}
-    std::cout<<"Calibration waits for actual brightness completion, shares one restore, rejects other peers' release, cleans up cancellation/disconnect/failure and rearms idle monitoring.\n";
+    std::cout<<"Calibration waits for brightness completion, shares restoration, cleans up cancellation/disconnect/failure, and invalidates measurements on broker loss.\n";
 }
 #include "calibration_session.moc"

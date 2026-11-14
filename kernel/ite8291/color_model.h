@@ -64,7 +64,8 @@ static inline int slayer_color_model_apply(const unsigned char *model, const uns
         w[1]=slayer_color_det(x,c,d);w[2]=slayer_color_det(b,x,d);w[3]=slayer_color_det(b,c,x);w[0]=den-w[1]-w[2]-w[3];
         if(den<0){den=-den;for(j=0;j<4;++j)w[j]=-w[j];}
         if(w[0]<0||w[1]<0||w[2]<0||w[3]<0)continue;
-        for(channel=0;channel<3;++channel){long long sum=0;for(j=0;j<4;++j)sum+=w[j]*slayer_color_vertex(model,cell[j])[3+channel];out[channel]=(sum+den/2)/den;}
+        /* Nonnegative barycentric weights keep this convex sum in 0..255. */
+        for(channel=0;channel<3;++channel){long long sum=0;for(j=0;j<4;++j)sum+=w[j]*slayer_color_vertex(model,cell[j])[3+channel];out[channel]=(unsigned char)((sum+den/2)/den);}
         return 1;
     }
     return 0;

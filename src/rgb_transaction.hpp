@@ -21,6 +21,7 @@ class RgbTransaction {
     const Io& io;
     FileLock lock;
     std::string buffer;
+    std::string effectPath,savedEffect;
     bool active=false;
 public:
     explicit RgbTransaction(const Io& value,bool batch=true):io(value),lock(value,"rgb") {
@@ -33,6 +34,25 @@ public:
             if(!buffer.empty())throw Error("Birden fazla RGB tamponu bulundu; aygıt seçimi belirsiz.",4);
             if(trim(io.read(path))!="0")throw Error("RGB tamponu meşgul.",4);
             buffer=path;
+        }
+        if(!buffer.empty()){
+            effectPath=buffer.substr(0,buffer.rfind('/')+1)+"hardware_effect";
+            if(io.exists(effectPath)){
+                const auto state=words(io.read(effectPath));
+                if(state.size()!=4)throw Error("Önceki donanım efekti okunamadı; renk yazılmadı.",4);
+                const int mode=integer(state[0],0,51,"Önceki efekt");
+                const int speed=integer(state[1],1,10,"Önceki efekt hızı");
+                const int brightness=integer(state[2],0,50,"Önceki efekt parlaklığı");
+                const int direction=integer(state[3],0,4,"Önceki efekt yönü");
+                if(mode!=51){
+                    const std::vector<int> supported{0,2,3,4,5,6,9,10,14,17};
+                    if(std::find(supported.begin(),supported.end(),mode)==supported.end()||
+                       (mode==3?direction<1:mode!=0&&direction!=0))
+                        throw Error("Önceki donanım efekti geri yüklenemiyor; renk yazılmadı.",4);
+                    savedEffect=std::to_string(mode)+" "+std::to_string(speed)+" "+
+                        std::to_string(mode?brightness:0)+" "+std::to_string(mode?direction:0);
+                }
+            }
         }
     }
     void begin() {
@@ -47,6 +67,12 @@ public:
         active=false;
     }
     bool batched()const{return !buffer.empty();}
+    void restoreEffect(){
+        if(savedEffect.empty())return;
+        finish();
+        io.write(effectPath,savedEffect+"\n");
+        if(!io.dry()&&trim(io.read(effectPath))!=savedEffect)throw Error("Önceki donanım efekti geri yüklenemedi.",4);
+    }
     ~RgbTransaction(){if(active)try{io.write(buffer,"0\n");}catch(...){}}
 };
 }

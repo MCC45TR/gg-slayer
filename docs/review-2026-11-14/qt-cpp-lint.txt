@@ -1,0 +1,26 @@
+Paths relative to /home/mcc45tr/Projeler/slayerctl/
+55 finding(s), 12 distinct rule/message pair(s)
+DEP-5 QPair — use std::pair (alias since Qt 6.0) (5)
+  gui/keyboard_map.cpp:114  gui/legacy_main.cpp:67,111,176,339
+DEP-7 qMin/qMax/qBound — use (std::min)()/(std::max)()/std::clamp() (6)
+  gui/controller.cpp:81,88  gui/laptop.hpp:39  gui/legacy_main.cpp:495  gui/widgets.hpp:204,211
+ENM-2 Unscoped enum without explicit underlying type — add type to prevent BiC (1)
+  gui/legacy_main.cpp:41
+ENM-9 Non-intuitive bool literal arguments — confusing at call site; use named enums (1)
+  src/profile_sync.cpp:58
+ENM-9 Two or more bool parameters — boolean trap; use named enums (f(x, LogRule::DontLog)) (1)
+  src/profile_sync.hpp:11
+HDR-3 Unprotected std::min/max — use (std::min)(a,b) for Windows macro safety (6)
+  gui/widgets.hpp:70,73  src/effects.cpp:91  src/hardware.cpp:93  src/idle_curve.hpp:29  src/io.cpp:95
+PAT-12 Non-const range-for reference — may trigger COW detach; use const auto& if read-only (16)
+  gui/backend.cpp:82,106  gui/widgets.hpp:182  service/command.cpp:9  service/idle_dimmer.cpp:56  src/hardware.cpp:195  src/io.cpp:151,153,159,161,164,175,176,177,204  src/layout.cpp:161
+PAT-2 std::optional default-constructed — use std::nullopt explicitly (GCC warning bug) (2)
+  src/core.hpp:30  src/telemetry.cpp:17
+PAT-7 QMap usage — verify copying is needed; std::map saves ~1.7KiB text (3)
+  desktop/session_main.cpp:87  gui/legacy_main.cpp:64,68
+PAT-8 QMap with pointer keys — use QHash (pointer ordering unreliable) (1)
+  gui/legacy_main.cpp:68
+TMO-1 Integer timeout/interval parameter — use QDeadlineTimer or std::chrono (3)
+  service/internal_keyboard.cpp:68  src/core.hpp:58  src/io.cpp:145
+VAR-3 Direct brace initialization — prefer copy-init (var = {...}) for safety (10)
+  desktop/main.cpp:58  gui/controller.cpp:18  gui/kenning.cpp:62  gui/keyboard_map.cpp:34  service/command.cpp:30,44  service/main.cpp:196  src/gpu_limits.cpp:32  src/hardware.cpp:40  src/io.cpp:194

@@ -57,7 +57,7 @@ void SlayerBackend::openColorCalibration(){
 }
 void SlayerBackend::openSettings(const QString&module){
     if(m_preview)return;
-    if(module!=QStringLiteral("display")&&module!=QStringLiteral("touchpad")&&module!=QStringLiteral("power"))return;
+    if(module!=QStringLiteral("display")&&module!=QStringLiteral("touchpad")&&module!=QStringLiteral("power")&&module!=QStringLiteral("shortcuts"))return;
     QProcess::startDetached(QStringLiteral(SLAYER_CLI),{QStringLiteral("desktop"),QStringLiteral("settings"),module});
 }
 void SlayerBackend::refresh(){if(m_busy)return;m_mutating=false;start(QStringLiteral(SLAYER_CLI),{QStringLiteral("ui-data")},true);}

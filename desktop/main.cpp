@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 #include "power.hpp"
+#include "shortcut.hpp"
 #include <QCoreApplication>
 #include <QDBusInterface>
 #include <QDBusReply>
@@ -33,6 +34,7 @@ static int reloadSession(bool restart=false){
 }
 int main(int argc,char** argv){
     QCoreApplication app(argc,argv);auto args=app.arguments();args.removeFirst();
+    if(args.size()==2&&args[0]=="--shortcut"&&geteuid()!=0)return desktopShortcut(args[1]);
     if(args==QStringList{"--reload-session"}||args==QStringList{"--reload-session-user"})return reloadSession();
     if(args==QStringList{"--restart-session"}||args==QStringList{"--restart-session-user"})return reloadSession(true);
     if(args.size()==2&&args[0]=="--accent"&&QStringList{"status","on","off"}.contains(args[1])&&geteuid()!=0){
@@ -49,8 +51,8 @@ int main(int argc,char** argv){
             QDBusReply<QVariantMap> result=core.call("ReadSessionSettings");if(!result.isValid())return 4;
             auto values=result.value();
             if(geteuid()!=0){
-                QDBusInterface session("org.gamegaraj.Slayer.Session1","/org/gamegaraj/Slayer/Session1","org.gamegaraj.Slayer.Session1",QDBusConnection::sessionBus());session.setTimeout(2000);
-                QDBusReply<QVariantMap> desktop=session.call("Status");
+                auto request=QDBusMessage::createMethodCall("org.gamegaraj.Slayer.Session1","/org/gamegaraj/Slayer/Session1","org.gamegaraj.Slayer.Session1","Status");request.setAutoStartService(false);
+                QDBusReply<QVariantMap> desktop=QDBusConnection::sessionBus().call(request,QDBus::Block,2000);
                 if(desktop.isValid()){const auto state=desktop.value();for(auto it=state.cbegin();it!=state.cend();++it)values.insert("session_"+it.key(),it.value());}
             }
             QTextStream out(stdout);for(auto it=values.cbegin();it!=values.cend();++it)out<<it.key()<<": "<<it.value().toString()<<'\n';return 0;
@@ -63,9 +65,9 @@ int main(int argc,char** argv){
         if(!result.isValid()){QTextStream(stderr)<<result.error().message()<<'\n';return 4;}
         QTextStream(stdout)<<result.value();return 0;
     }
-    if(args.value(0)=="--settings"&&args.size()==2&&QStringList{"display","touchpad","power"}.contains(args[1])&&geteuid()!=0){
+    if(args.value(0)=="--settings"&&args.size()==2&&QStringList{"display","touchpad","power","shortcuts"}.contains(args[1])&&geteuid()!=0){
         const auto module=args[1];const bool gnome=qEnvironmentVariable("XDG_CURRENT_DESKTOP").contains("GNOME",Qt::CaseInsensitive);
-        const auto panel=gnome?(module=="touchpad"?QString("mouse"):module):(module=="display"?QString("kcm_kscreen"):module=="touchpad"?QString("kcm_touchpad"):QString("kcm_powerdevilprofilesconfig"));
+        const auto panel=gnome?(module=="touchpad"?QString("mouse"):module=="shortcuts"?QString("keyboard"):module):(module=="display"?QString("kcm_kscreen"):module=="touchpad"?QString("kcm_touchpad"):module=="shortcuts"?QString("kcm_keys"):QString("kcm_powerdevilprofilesconfig"));
         return QProcess::startDetached(gnome?"/usr/bin/gnome-control-center":"/usr/bin/kcmshell6",{panel})?0:4;
     }
     if(args==QStringList{"--reboot"}&&geteuid()!=0){

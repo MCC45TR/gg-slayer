@@ -14,6 +14,14 @@ PageBody {
         iconName: "computer-laptop"
         QQC2.Label { text: device.info.hardware_writes === "blocked" ? qsTr("BIOS doğrulanmalı · donanım değişiklikleri kapalı") : qsTr("Günlük kontrolleriniz, tek yerde."); wrapMode: Text.WordWrap; Layout.fillWidth: true }
     }
+    Flow {
+        Layout.fillWidth: true
+        spacing: Kirigami.Units.smallSpacing
+        QQC2.Button { text: qsTr("Sensörleri yenile"); icon.name: "view-refresh"; onClicked: control.refreshTelemetry() }
+        QQC2.CheckBox { text: qsTr("Canlı sensörler · 10 saniyede bir"); checked: control.liveTelemetry; onToggled: control.liveTelemetry = checked }
+        QQC2.CheckBox { text: qsTr("Fan animasyonları"); checked: !control.reducedMotion; onToggled: control.reducedMotion = !checked }
+    }
+    QQC2.Label { text: control.liveTelemetry ? qsTr("Canlı takip yalnız bu sayfa görünürken çalışır.") : qsTr("Sensörler sayfa açıldığında ve yenilemeye bastığınızda okunur."); wrapMode: Text.WordWrap; Layout.fillWidth: true }
     GridLayout {
         Layout.fillWidth: true
         columns: root.width >= 1350 ? 4 : root.width >= 650 ? 2 : 1

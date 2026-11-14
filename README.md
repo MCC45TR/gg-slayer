@@ -15,7 +15,7 @@ sudo dnf upgrade --refresh 'slayer*' 'ite8291r3*' 'kmod-slayerctl*' 'kmod-ite829
 | Paket | İşlev |
 | --- | --- |
 | `slayerctl` | CLI, sistem D-Bus brokeri, DE bağlantıları, oturum ve donanım yürütmesi |
-| `slayer-control-qt` | Kirigami Qt arayüzü ve KDE Sistem Ayarları modülü |
+| `slayer-control-qt` | Kirigami Qt arayüzü, KDE Sistem Ayarları modülü ve yerel kamera tepsi bileşeni |
 | `slayer-face-auth` | Doğrulanmış IR kamerayla açık Howdy kayıt/test aracı |
 | `slayer-control-gtk` | GNOME için yer tutucu pencere; işlevsel kontrol paneli henüz yok |
 | `slayerctl-r9t-kmod` | COPR'da derlenen, tam modelle sınırlandırılmış R9T sürücüsü |
@@ -47,7 +47,53 @@ slayerctl doctor
 Yedi arayüz bölümü: Genel Bakış, Aydınlatma, Güç ve Pil, Performans, Aygıtlar,
 Otomasyon, Destek. TR ISO klavye çizimi sistemin tuş düzenini izler. Günlük
 seçimler doğrudan uygulanır; gelişmiş işlemler açık eylemlerle gönderilir.
-Gizli sayfalar sensör yenilemez; fan animasyonları görünmeyince durur.
+Sensörler varsayılan olarak Genel Bakış açıldığında ve **Sensörleri yenile** ile
+okunur. **Canlı sensörler** isteğe bağlıdır; etkin penceredeki Genel Bakış'ta
+10 saniyede bir çalışır. Fan animasyonları varsayılan olarak kapalıdır.
+Pencere odağı kaybolduğunda, küçültüldüğünde veya sayfa değiştiğinde canlı takip durur.
+
+KDE Plasma sistem tepsisindeki **Slayer Kamera Gizliliği**, dahili RGB/IR kamerayı
+açıp kapatır. Kamera kapatıldığında simge erişilebilir kalır; ana arayüzün açık
+olması gerekmez. Paket kurulduktan sonra gerekirse Sistem Tepsisi Ayarları →
+Girdiler bölümünden görünürlüğü seçin. Plasma'nın kendi Kamera Göstergesi kullanım
+durumunu gösterir; Slayer bileşeni kamera erişimini denetler.
+
+**Güç ve Pil → Şarj sınırı → Azami dolum miktarı (%)** her zaman görünür.
+Desteklenen cihazda değişikliği **Uygula ve kaydet** ile gönderin. R9T'nin mevcut
+BIOS'unda sayısal eşik sunulmadığından alan kapalıdır ve nedeni yazılır.
+Mevcut üç pil koruma profili belirli bir yüzde garantisi değildir.
+[KDE kamera ve dolum sınırı doğrulaması](docs/NATIVE-KDE.md).
+
+## Copilot tuşu
+
+**Aygıtlar → Copilot tuşu** bölümünde işlevi kullanıcı seçer: uygulama veya web
+adresi açma, Slayer Control, Fan Boost aç/kapat, otomatik fan, güç profili
+döngüsü, doğrudan tasarruf/dengeli/performans veya özel komut.
+Kısayol düğmesine tıklayıp fiziksel Copilot tuşuna basın, sonra **Atamayı kaydet**
+ile uygulayın. Başlangıç önerisi `Meta+Shift+F23`'tür; tuş kaydı cihazın gerçek
+dizilimini kullanmanızı sağlar. Başka bir KDE ataması çakışırsa mevcut kısayol
+korunur ve KDE kısayollarını açarak çözebilirsiniz. Atama kaldırılabilir.
+
+KDE, kullanıcıya ait native başlatıcıyı pencere kapalıyken de çalıştırır.
+Copilot için resident Slayer süreci, giriş aygıtı izleyicisi veya root ayarı
+gerekmez. Özel komut kendi kullanıcı yetkisiyle başlatılır; program ve
+argümanları ayrı tutulur. Kabuk işlemleri istenirse kullanıcı kendi betiğini
+seçebilir. Fan/güç eylemleri yalnız tuşa basıldığında mevcut ctl brokerine
+gider, yetkilendirilir ve kullanıcı tercihini kaydeder. Donanım destek/model
+denetimleri geçerlidir. KDE Plasma genel kısayol hizmeti gerekir.
+
+## Arka plan çalışması
+
+Arayüz kapatılınca sonlanır. Aktif istemci, kalibrasyon, profil eşitlemesi ve
+bekleme ışığı özelliği yoksa sistem brokeri beş saniye içinde kapanır.
+Kullanıcı oturum köprüsü yalnız etkin KDE bekleme ışığı devri veya kalibrasyon
+sırasında açık kalır; diğer durumda aboneliğini bırakıp yaklaşık 2,5 saniyede
+kapanır. Salt okunur durum sorgusu kapalı oturum köprüsünü başlatmaz.
+
+Bekleme ışığı veya profil eşitlemesi özellikle açılmışsa gerekli sistem
+gözlemcisi olayları bekler. Periyodik sensör taraması yapmaz; yerleşik klavye
+izlemesi yalnız güç tasarrufunda ve ışık açıkken etkinleşir. Geçiş dışında
+parlaklık zamanlayıcısı durur. Copilot ataması bu servisleri açık tutmaz.
 
 Güç tasarrufunda bekleme ışığı, seçili parlaklığı KDE'de değiştirmeden beş
 saniyede en düşük açık seviyeye iner ve etkinlikte geri yükselir. Sıfır parlaklık
@@ -64,6 +110,20 @@ seçimleri korur. Genel EC/NVRAM, özel fan eğrisi, CPU OC/voltaj ve OEM cTGP
 komutları açılmaz. Destek bildirimi gerçek yetenek ve doğrulama durumunu gösterir.
 
 ## Yüz tanıma
+
+Qt uygulamasında **Aygıtlar → IR yüz tanıma**, isteğe bağlı
+[Kenning](https://github.com/RishonDev/kenning) entegrasyonunu sunar. Kurulumu ve
+kayıtlı kamera seçimini salt okunur gösterir; **Kenning ayarlarını aç** düğmesi
+Kenning'in yerel KDE modülünü açar. Yüz kaydı, IR kamera seçimi, kilit ekranı ve
+`sudo` tercihleri bu modülde yönetilir. Kenning ayrıca kurulmalıdır; Slayer
+paketi onu indirmez, başlatmaz veya PAM politikasını değiştirmez.
+
+Durum yalnız Aygıtlar sayfası açıldığında veya **Durumu yenile** ile okunur.
+Slayer tarafında kamera açılmaz, yüz modeli yüklenmez, Kenning soketine bağlanılmaz
+ve yeni arka plan işi/zamanlayıcı eklenmez. `slayerctl` ve servislerinin
+bağımlılıkları değişmez. Bilinen dahili IR USB arayüzü ayrıca kontrol edilir;
+RGB seçimi ve doğrulanamayan kamera açıkça gösterilir. Bu kontrol Kenning'in
+ayarlarını zorlamaz ve gerçek yüz doğrulama testi yerine geçmez.
 
 `slayer-face-auth` Howdy kayıt/test ön yüzüdür; Howdy motorunun kendisi değildir.
 RPM kurulumu kamera açmaz, kullanıcı kaydetmez veya PAM politikalarını değiştirmez.

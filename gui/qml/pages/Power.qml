@@ -20,9 +20,16 @@ PageBody {
         QQC2.Label { text: qsTr("Sağlık: %1 % · Döngü: %2").arg(device.info.battery_health || "—").arg(device.info.battery_cycles || "—"); wrapMode: Text.WordWrap; Layout.fillWidth: true }
     }
     Section {
-        Layout.fillWidth: true; Layout.alignment: Qt.AlignTop; title: qsTr("Şarj sınırı"); subtitle: qsTr("Yalnız kernelin bildirdiği yüzde eşiği destekleniyorsa kullanılır.")
-        QQC2.SpinBox { id: limit; from: 50; to: 100; value: Number(device.info.battery_limit || 80); visible: device.ready("battery-limit"); enabled: !control.busy; Accessible.name: qsTr("Şarjı durdur (%)"); onValueModified: control.apply(["battery", "limit", String(value)], ["battery_end", String(value)]) }
-        QQC2.Label { text: device.reason("battery-limit"); visible: !device.ready("battery-limit"); wrapMode: Text.WordWrap; Layout.fillWidth: true }
+        Layout.fillWidth: true; Layout.alignment: Qt.AlignTop; title: qsTr("Şarj sınırı"); subtitle: qsTr("KDE ile aynı standart pil eşiğini kullanır.")
+        BatteryLimit {
+            Layout.fillWidth: true
+            supported: device.ready("battery-limit")
+            busy: control.busy
+            currentLimit: device.info.battery_limit || ""
+            reason: device.reason("battery-limit")
+            onApplyRequested: percent => control.apply(["battery", "limit", String(percent)], ["battery_end", String(percent)])
+        }
+        QQC2.Label { text: qsTr("Yüzde eşiği sunulmuyorsa Pil koruması bölümündeki firmware profillerini kullanabilirsiniz. Bu profiller belirli bir yüzdeyi garanti etmez."); visible: !device.ready("battery-limit") && device.ready("battery-profile"); wrapMode: Text.WordWrap; Layout.fillWidth: true }
     }
     }
 }

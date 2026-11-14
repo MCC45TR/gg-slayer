@@ -1,0 +1,18 @@
+{
+    "KPackageStructure": "Plasma/Applet",
+    "KPlugin": {
+        "Id": "org.gamegaraj.slayerctl.camera",
+        "Name": "Slayer Camera Privacy",
+        "Name[tr]": "Slayer Kamera Gizliliği",
+        "Description": "Enable or disable the built-in RGB and IR camera",
+        "Description[tr]": "Dahili RGB ve IR kamerayı açın veya kapatın",
+        "Icon": "camera-web",
+        "Category": "System Information",
+        "Version": "0.1.5",
+        "License": "MIT",
+        "EnabledByDefault": true,
+        "Authors": [{"Name": "MCC45TR", "Email": "mcc45tr@gmail.com"}]
+    },
+    "X-Plasma-API-Minimum-Version": "6.0",
+    "X-Plasma-NotificationAreaCategory": "Hardware"
+}

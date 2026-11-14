@@ -1,5 +1,5 @@
 Name:           slayerctl
-Version:        0.1.4
+Version:        0.1.5
 Release:        1%{?dist}
 Summary:        Game Garaj Slayer hardware control backend
 License:        MIT AND LGPL-2.1-or-later
@@ -10,11 +10,13 @@ BuildRequires:  gcc-c++, cmake, make, ninja-build, python3-devel
 BuildRequires:  openssl-devel
 BuildRequires:  qt6-qtbase-devel, qt6-qtdeclarative-devel, extra-cmake-modules
 BuildRequires:  kf6-kcmutils-devel, pkgconfig(xkbcommon), pkgconfig(wayland-client)
+BuildRequires:  kf6-kservice-devel, kf6-kconfig-devel, kf6-kcoreaddons-devel, kf6-kdeclarative
 BuildRequires:  pkgconfig(libsystemd)
 BuildRequires:  systemd-rpm-macros, desktop-file-utils, breeze-icon-theme
 BuildRequires:  kf6-kirigami, kf6-qqc2-desktop-style, qt6-qtimageformats
 BuildRequires:  desktop-backgrounds-kde, xkeyboard-config
 BuildRequires:  dbus-daemon
+BuildRequires:  libplasma
 Requires:       polkit, systemd, systemd-udev, /usr/bin/systemd-creds
 Recommends:     slayerctl-r9t-kmod, ite8291r3-kmod
 Recommends:     (powerdevil-keyboard-idle-inhibition if powerdevil)
@@ -30,6 +32,7 @@ Summary:        Native KDE Qt frontend for slayerctl
 Requires:       slayerctl%{?_isa} = %{version}-%{release}
 Requires:       qt6-qtwayland, qt6-qtimageformats, kf6-kirigami, kf6-qqc2-desktop-style
 Requires:       kf6-kcmutils, qt6-qtdeclarative
+Requires:       kf6-kdeclarative
 Suggests:       python3-pyside6
 Provides:       slayerctl-gui = %{version}-%{release}
 Provides:       slayerctl-kde = %{version}-%{release}
@@ -37,7 +40,11 @@ Obsoletes:      slayerctl-gui < 0.1.0
 Obsoletes:      slayerctl-kde < 0.1.0
 %description -n slayer-control-qt
 Kirigami control interface and KDE System Settings module. Hardware logic
-and desktop integration belong to slayerctl. Developer: MCC45TR.
+and desktop integration belong to slayerctl. The Qt application can open
+separately installed Kenning settings without loading a face recognition engine.
+Includes a native Plasma tray applet for built-in camera privacy, without
+an additional background process or periodic hardware polling.
+Developer: MCC45TR.
 
 %package -n slayer-face-auth
 Summary:        Validated IR enrollment and test frontend
@@ -105,7 +112,7 @@ desktop-file-validate %{buildroot}%{_datadir}/applications/slayer-control-gtk.de
 
 %files
 %license LICENSE tools/COPYING.LGPL-2.1
-%doc README.md AUTHORS docs/KIRIGAMI-IMPLEMENTATION.md docs/COPR.md docs/IDLE-DIMMING.md docs/KDE-FACE.md
+%doc README.md AUTHORS docs/KIRIGAMI-IMPLEMENTATION.md docs/COPR.md docs/IDLE-DIMMING.md docs/KDE-FACE.md docs/NATIVE-KDE.md docs/CHARGING-R9T.md docs/COPILOT-VE-KAYNAK.md docs/REVIEW-2026-11-14.md
 %{_bindir}/slayerctl
 %{_libexecdir}/slayerctl-helper
 %{_libexecdir}/slayerctl-module-sign
@@ -137,6 +144,8 @@ desktop-file-validate %{buildroot}%{_datadir}/applications/slayer-control-gtk.de
 %{_datadir}/applications/slayer-control.desktop
 %{_libdir}/qt6/plugins/plasma/kcms/systemsettings/kcm_slayerctl.so
 %{_datadir}/applications/kcm_slayerctl.desktop
+%{_datadir}/plasma/plasmoids/org.gamegaraj.slayerctl.camera/
+%{_libdir}/qt6/qml/org/gamegaraj/
 %dir %{_datadir}/slayerctl
 %dir %{_datadir}/slayerctl/tools
 %{_datadir}/slayerctl/tools/*.py
@@ -151,6 +160,9 @@ desktop-file-validate %{buildroot}%{_datadir}/applications/slayer-control-gtk.de
 %{_datadir}/applications/slayer-control-gtk.desktop
 
 %changelog
+* Sat Nov 14 2026 MCC45TR <mcc45tr@gmail.com> - 0.1.5-1
+- Add native Plasma camera privacy, configurable Copilot actions and visible charge limits.
+- Reduce idle work and harden command queuing, privilege boundaries and device rollback.
 * Sat Nov 14 2026 MCC45TR <mcc45tr@gmail.com> - 0.1.3-4
 - Keep explicit ACPI object types in the read-only diagnostic mailbox request.
 * Sat Nov 14 2026 MCC45TR <mcc45tr@gmail.com> - 0.1.3-3

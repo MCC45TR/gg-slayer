@@ -54,6 +54,8 @@ Standart kernel arayüzü sağlandığında:
   sudo slayerctl profile sync on|off  KDE / EC modlarını olaylarla eşitle
   sudo slayerctl profile set low-power|balanced|performance
   sudo slayerctl fan auto|boost
+  sudo slayerctl fan toggle          Fan Boost aç/kapat
+  slayerctl fan mode                 Yalnız fan modunu oku
   slayerctl cpu status
   sudo slayerctl cpu boost on|off
   sudo slayerctl cpu limits 500 2500
@@ -86,6 +88,8 @@ Kalıcı yapılandırma (JSON yok):
 
 Diğer:
   slayerctl gui                     Slayer Control uygulamasını aç
+  slayerctl shortcut fan-boost       Copilot için yetkilendirilmiş fan geçişi
+  slayerctl shortcut power-cycle     Desteklenen masaüstü güç profillerini sırala
   slayerctl kde                     KDE Sistem Ayarları modülünü aç
   slayerctl power status            KDE/GNOME ortak güç profili
   slayerctl power set balanced      Mevcut masaüstü servisine profil isteği
@@ -123,7 +127,7 @@ int slayerMain(int argc,char**argv){
                 ||(c=="battery"&&args.size()>1&&(args[1]=="limit"||args[1]=="profile"))
                 ||(c=="power"&&args.size()==3&&args[1]=="set")
                 ||(c=="profile"&&args.size()>1&&(args[1]=="set"||args[1]=="sync"))
-                ||(c=="fan"&&args.size()>1&&(args[1]=="auto"||args[1]=="boost"||args[1]=="curve"))
+                ||(c=="fan"&&args.size()>1&&(args[1]=="auto"||args[1]=="boost"||args[1]=="toggle"||args[1]=="curve"))
                 ||(c=="cpu"&&args.size()>1&&(args[1]=="boost"||args[1]=="limits"||args[1]=="smt"))
                 ||(c=="gpu"&&args.size()>1&&(args[1]=="power-limit"||args[1]=="mode"))
                 ||(c=="settings"&&args.size()==3)
@@ -148,9 +152,9 @@ int slayerMain(int argc,char**argv){
                     const auto channels=slayer::words(io.read(led.path+"/multi_intensity"));
                     if(channels.size()!=led.channels.size()||channels.size()!=3)continue;
                     int rgb[3]={-1,-1,-1};
-                    for(std::size_t i=0;i<channels.size();++i){
-                        const int index=led.channels[i]=="red"?0:led.channels[i]=="green"?1:led.channels[i]=="blue"?2:-1;
-                        if(index>=0)rgb[index]=slayer::integer(channels[i],0,led.channelMax.at(i),"RGB kanalı")*255/led.channelMax.at(i);
+                    for(std::size_t channel=0;channel<channels.size();++channel){
+                        const int index=led.channels[channel]=="red"?0:led.channels[channel]=="green"?1:led.channels[channel]=="blue"?2:-1;
+                        if(index>=0)rgb[index]=slayer::integer(channels[channel],0,led.channelMax.at(channel),"RGB kanalı")*255/led.channelMax.at(channel);
                     }
                     if(rgb[0]>=0&&rgb[1]>=0&&rgb[2]>=0)std::cout<<"key-rgb\t"<<led.index<<'\t'<<rgb[0]<<'\t'<<rgb[1]<<'\t'<<rgb[2]<<'\n';
                 }catch(const slayer::Error&){/* An unreadable LED does not hide other device information. */}
@@ -189,12 +193,13 @@ int slayerMain(int argc,char**argv){
             if(io.fixture())throw slayer::Error("Test kipinde sistem D-Bus'una erişilmez.",4);
             if(io.dry())std::cout<<"Önizleme: mevcut KDE/GNOME güç servisi isteği; firmware/EC yazması yok.\n";
             else {args.insert(args.begin(),"/usr/libexec/slayerctl-desktop");std::cout<<slayer::capture(args,7000)<<'\n';}
-        }else if(command=="idle"||command=="desktop"){
+        }else if(command=="idle"||command=="desktop"||command=="shortcut"){
             if(helper||io.fixture())throw slayer::Error("Bu komut kullanıcı oturumunda çalıştırılmalı.");
             if(command=="idle")args.insert(args.begin(),"--idle");
+            else if(command=="shortcut"&&args.size()==1)args.insert(args.begin(),"--shortcut");
             else if(args.size()==2&&args[0]=="settings")args={"--settings",args[1]};
             else if(args.size()==1&&args[0]=="reboot")args={"--reboot"};
-            else throw slayer::Error("Kullanım: desktop settings display|touchpad|power | desktop reboot");
+            else throw slayer::Error("Kullanım: desktop settings display|touchpad|power|shortcuts | desktop reboot");
             if(io.dry())std::cout<<"Önizleme: ctl masaüstü bağlantısı.\n";
             else{args.insert(args.begin(),"/usr/libexec/slayerctl-desktop");std::cout<<slayer::capture(args,95000);}
         }else if(command=="service"){

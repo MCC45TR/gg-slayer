@@ -82,7 +82,7 @@ void keyboard(const Io &io,const std::vector<std::string>&a) {
         if(white)for(const auto& key:keys){auto value=trim(io.read(key.path+"/multi_intensity"));validateSavedColor(key,value);colors.emplace_back(key.path+"/multi_intensity",value);}
         bool attempted=false;
         try {
-            transaction.begin();attempted=true;io.write(target,point+"\n");
+            attempted=true;transaction.begin();io.write(target,point+"\n");
             if(white)for(const auto& key:keys){std::string value;for(auto maximum:key.channelMax){if(!value.empty())value+=' ';value+=std::to_string(maximum);}io.write(key.path+"/multi_intensity",value+"\n");}
             transaction.finish();
             if(!io.dry()&&trim(io.read(target))!=point)throw Error("Beyaz noktası geri okuması uyuşmadı.",4);
@@ -93,6 +93,7 @@ void keyboard(const Io &io,const std::vector<std::string>&a) {
                 try{io.write(target,previous+"\n");}catch(...){restored=false;}
                 for(const auto& [path,value]:colors)try{io.write(path,value+"\n");}catch(...){restored=false;}
                 try{transaction.finish();}catch(...){restored=false;}
+                try{transaction.restoreEffect();}catch(...){restored=false;}
             }
             if(!restored)throw Error("Kalibrasyon uygulanamadı; önceki renkler tam geri yüklenemedi.",4);
             throw;
@@ -175,6 +176,7 @@ void applyColors(const Io&io,const std::map<int,std::string>&colors,int brightne
     bool attempted=false;
     std::vector<std::pair<std::string,std::string>> expected;
     try{
+        attempted=true;
         transaction.begin();
         for(const auto&k:keys)if(parsed.contains(k.index)){
             const auto rgb=parsed.at(k.index);std::string output;
@@ -203,6 +205,7 @@ void applyColors(const Io&io,const std::map<int,std::string>&colors,int brightne
             for(const auto&[p,v]:oldBrightness){try{io.write(p,v+"\n");if(trim(io.read(p))!=v)restored=false;}catch(...){restored=false;}}
         }
         try{transaction.finish();}catch(...){restored=false;}
+        try{transaction.restoreEffect();}catch(...){restored=false;}
         if(!restored)throw Error("RGB uygulanamadı; önceki renk/parlaklık tam geri yüklenemedi.",4);
         throw;
     }
@@ -246,6 +249,7 @@ void locate(const Io&io,int index){
         if(trim(io.read(path))!=value)restored=false;
     }catch(...){restored=false;}
     try{transaction.finish();}catch(...){restored=false;}
+    try{transaction.restoreEffect();}catch(...){restored=false;}
     if(!restored)throw Error("LED tanıma bitti; önceki klavye durumu tam geri yüklenemedi.",4);
     if(failure)std::rethrow_exception(failure);
 

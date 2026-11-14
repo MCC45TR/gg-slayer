@@ -23,7 +23,8 @@ void colorProfile(const Io& io,const std::vector<std::string>& a){
     std::string name,desired,file,oldFile;
     bool save=false,hadFile=false;
     if(a[0]=="off"||a[0]=="reset"){
-        if(a.size()!=1)throw Error("Bu işlem ek argüman kabul etmez.");desired=a[0];
+        if(a.size()!=1)throw Error("Bu işlem ek argüman kabul etmez.");
+        desired=a[0];
     }else if((a[0]=="set"&&a.size()>=3&&a.size()<=9)||(a[0]=="apply"&&a.size()==2)){
         name=a[1];validateProfileName(name);if(name=="off")throw Error("Bu profil adı ayrılmış.");
         file="/etc/slayerctl/color-profiles/"+name+".conf";

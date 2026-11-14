@@ -18,11 +18,13 @@ class Controller:public QObject {
     Q_PROPERTY(bool active READ active WRITE setActive NOTIFY changed)
     Q_PROPERTY(bool monitoring READ monitoring WRITE setMonitoring NOTIFY changed)
     Q_PROPERTY(bool reducedMotion READ reducedMotion WRITE setReducedMotion NOTIFY changed)
+    Q_PROPERTY(bool liveTelemetry READ liveTelemetry WRITE setLiveTelemetry NOTIFY changed)
     struct Pending{QStringList command,remember;};
     SlayerBackend* device;
     bool foreground=false;
-    bool fixture=false,working=false,visible=false,sampling=false,reduce=false,ppAvailable=false;
-    QString lastError,diagnostic,power;
+    bool refreshing=false,refreshPending=false;
+    bool fixture=false,working=false,visible=false,sampling=false,reduce=true,live=false,ppAvailable=false;
+    QString lastError,stateError,diagnostic,power;
     QStringList ppChoices;
     QVariantMap values;
     QTimer timer;
@@ -37,7 +39,7 @@ public:
     Controller(SlayerBackend*,bool fixtureMode,QObject* parent=nullptr);
     bool preview()const{return fixture;}
     QVariantMap metrics()const{return values;}
-    QString error()const{return lastError;}
+    QString error()const{return lastError.isEmpty()?stateError:lastError;}
     QString output()const{return diagnostic;}
     bool busy()const{return working;}
     QString powerProfile()const{return power;}
@@ -47,14 +49,17 @@ public:
     void setActive(bool);
     bool monitoring()const{return visible;}
     bool reducedMotion()const{return reduce;}
+    bool liveTelemetry()const{return live;}
     void setMonitoring(bool);
     void setReducedMotion(bool);
+    void setLiveTelemetry(bool);
+    Q_INVOKABLE void refreshTelemetry(){previousTotal=previousIdle=0;telemetry();}
     Q_INVOKABLE void refresh();
     Q_INVOKABLE void apply(const QStringList& command,const QStringList& remember={});
     Q_INVOKABLE void setPower(const QString& value);
     Q_INVOKABLE void reboot();
     Q_INVOKABLE void diagnose(const QString& topic);
-    Q_INVOKABLE void clearError(){lastError.clear();Q_EMIT changed();}
+    Q_INVOKABLE void clearError(){lastError.clear();stateError.clear();Q_EMIT changed();}
 private Q_SLOTS:
     void stateChanged(){if(foreground)refresh();}
 Q_SIGNALS:

@@ -65,6 +65,14 @@ tekrar alır. Özellik kapatıldığında veya güç tasarrufundan çıkıldığ
 Gerekli PowerDevil uzantısı aynı COPR'dan sağlanır. Kurulu KDE bu arayüzü
 sunmuyorsa ctl oturum durumu eksik entegrasyonu açıkça bildirir.
 
+Oturum köprüsü güç tasarrufu dışında klavye devrini ve sistem brokerindeki
+aboneliğini bırakır; kalibrasyon yoksa yaklaşık 2,5 saniyede kapanır. Güç
+tasarrufuna geçildiğinde gerekli köprüyü sistem brokeri yeniden etkinleştirir.
+Bekleme ışığı özellikle açılmışsa sistem brokeri profil olaylarını almak için
+bekler; sürekli sensör taraması yapmaz. Bekleme ışığı/profil eşitlemesi kapalı,
+kalibrasyon ve aktif arayüz istemcisi yoksa broker beş saniyede kapanır.
+Salt okunur durum sorgusu kapalı kullanıcı köprüsünü başlatmaz.
+
 0.1.4'te aktif/bekleme geçişi tek bir hareket modeli kullanır. Aktif hedef
 KDE'nin seçtiği mantıksal parlaklık; bekleme hedefi görünür %4 tabandır.
 Yarıda gelen yerleşik tuş basışı, son USB kademesinden bağımsız olarak o anki

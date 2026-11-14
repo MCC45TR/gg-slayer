@@ -1,0 +1,31 @@
+{
+  "baseline": {
+    "mode": "baseline",
+    "host": "PySide6 6.12 / QCoreApplication + QQmlEngine",
+    "duration_s": 5,
+    "clock_ticks_s": 100,
+    "cpu_ticks_delta": 0,
+    "end": {
+      "cpu_ticks": 16,
+      "rss": "58040 kB",
+      "pss": "26296 kB",
+      "children": []
+    }
+  },
+  "camera": {
+    "mode": "camera",
+    "host": "PySide6 6.12 / QCoreApplication + QQmlEngine",
+    "duration_s": 5,
+    "clock_ticks_s": 100,
+    "cpu_ticks_delta": 0,
+    "end": {
+      "cpu_ticks": 16,
+      "rss": "60308 kB",
+      "pss": "24153 kB",
+      "children": []
+    },
+    "cameraState": 1,
+    "eventMonitoring": true,
+    "busy": false
+  }
+}

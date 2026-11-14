@@ -63,6 +63,22 @@ class Hardware(unittest.TestCase):
         self.assertNotIn('value\tprofile',output)
         self.assertEqual(old,self.snap())
 
+    def test_fan_toggle_and_mode_are_narrow_and_validated(self):
+        self.put('/sys/devices/platform/slayerctl/fan_mode','auto')
+        self.put('/sys/devices/platform/slayerctl/fan_modes_available','auto boost')
+        before=self.snap()
+        self.assertEqual(self.runcli('fan','mode').strip(),'auto')
+        self.assertEqual(before,self.snap())
+        self.runcli('fan','toggle')
+        self.assertEqual(self.get('/sys/devices/platform/slayerctl/fan_mode'),'boost')
+        self.runcli('fan','toggle')
+        self.assertEqual(self.get('/sys/devices/platform/slayerctl/fan_mode'),'auto')
+        self.put('/sys/devices/platform/slayerctl/fan_mode','firmware-custom')
+        before=self.snap();self.runcli('fan','toggle',ok=False);self.assertEqual(before,self.snap())
+        self.put('/sys/devices/platform/slayerctl/fan_mode','auto')
+        self.put('/sys/class/dmi/id/bios_version','unverified')
+        before=self.snap();self.runcli('fan','toggle',ok=False);self.assertEqual(before,self.snap())
+
     def test_kde_ownership_prevents_boot_rgb_and_brightness_writes(self):
         self.runcli('config','set','lighting_owner','kde','brightness_owner','kde',
                     'keyboard_color','FF0000','keyboard_brightness','80')
@@ -78,6 +94,45 @@ class Hardware(unittest.TestCase):
         stamp=config.stat().st_mtime_ns
         self.runcli('config','set','fan_mode','auto')
         self.assertEqual(stamp,config.stat().st_mtime_ns)
+
+    def test_temporary_rgb_restores_firmware_effect(self):
+        endpoint='/sys/bus/hid/devices/0003:048D:600B.0001/controls/hardware_effect'
+        for args in [('keyboard','identify','1'),
+                     ('keyboard','effect','wave','--duration','1','--fps','10'),
+                     ('keyboard','effect','breathe','--duration','1','--fps','10')]:
+            with self.subTest(args=args):
+                self.put(endpoint,'3 5 25 1')
+                old=self.snap()
+                process=subprocess.Popen([BIN,'--root',str(self.root),*args],stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
+                try:
+                    deadline=time.monotonic()+1
+                    color='/sys/class/leds/rgb:kbd_backlight/multi_intensity'
+                    brightness='/sys/class/leds/rgb:kbd_backlight/brightness'
+                    while time.monotonic()<deadline and process.poll() is None:
+                        if self.get(color)!='10 20 30' or self.get(brightness)!='25':
+                            break
+                        time.sleep(.002)
+                    self.assertIsNone(process.poll(),'Temporary operation ended before state simulation')
+                    # Model the native driver switching to USER mode on a
+                    # buffered frame (including restoration after breathe).
+                    self.put(endpoint,'51 5 25 0')
+                    out,err=process.communicate(timeout=8)
+                    self.assertEqual(process.returncode,0,out+err)
+                    self.assertEqual(self.snap(),old)
+                finally:
+                    if process.poll() is None:process.kill()
+                    process.communicate(timeout=2)
+
+    def test_buffer_store_failure_restores_firmware_effect(self):
+        endpoint='/sys/bus/hid/devices/0003:048D:600B.0001/controls/hardware_effect'
+        self.put(endpoint,'3 5 25 1')
+        self.put('/.slayerctl-fail-write-after','1')
+        effect=self.root/endpoint.lstrip('/')
+        stamp=effect.stat().st_mtime_ns
+        old=self.snap()
+        self.runcli('keyboard','color','ffffff',ok=False)
+        self.assertEqual(self.snap(),old)
+        self.assertNotEqual(effect.stat().st_mtime_ns,stamp,'Firmware mode was not restored after the failed buffer store')
 
     def test_last_rgb_snapshot_is_hidden_and_preserves_named_profiles(self):
         self.runcli('keyboard','profile','create','oyun','010203','40')

@@ -1,0 +1,7 @@
+Running as unit: run-p210959-i229934.service
+User D-Bus socket is reachable; /home entries: []
+          Finished with result: success
+Main processes terminated with: code=exited, status=0/SUCCESS
+               Service runtime: 53ms
+             CPU time consumed: 39ms
+                   Memory peak: 6.4M (swap: 0B)

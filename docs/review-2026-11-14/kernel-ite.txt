@@ -1,0 +1,9 @@
+make: Entering directory '/usr/src/kernels/7.4.0-0.rc2.261111g067c5c24cef2.21.fc46.x86_64'
+make[1]: Entering directory '/home/mcc45tr/Projeler/slayerctl/kernel/ite8291'
+  CC [M]  ite_8291.o
+  MODPOST Module.symvers
+  LD [M]  ite_8291.ko
+  BTF [M] ite_8291.ko
+Skipping BTF generation for ite_8291.ko due to unavailability of vmlinux
+make[1]: Leaving directory '/home/mcc45tr/Projeler/slayerctl/kernel/ite8291'
+make: Leaving directory '/usr/src/kernels/7.4.0-0.rc2.261111g067c5c24cef2.21.fc46.x86_64'

@@ -5,7 +5,7 @@
 %global kver %(v=$(rpm -q --qf '%%{VERSION}-%%{RELEASE}.%%{ARCH}\\n' kernel-devel 2>/dev/null); if test $? -eq 0; then echo "$v" | sort -V | tail -n1; else echo 0; fi)
 %global copr_build 0
 Name: ite8291r3-kmod
-Version: 0.0.20261114.2
+Version: 0.0.20261114.3
 Release: 1.%{copr_build}%{?dist}
 Summary: Native ITE keyboard LED driver with quiet idle brightness
 License: GPL-2.0-or-later
