@@ -14,7 +14,7 @@ Packager: MCC45TR <mcc45tr@gmail.com>
 Source0: slayerctl_r9t.tar.gz
 ExclusiveArch: x86_64
 BuildRequires: gcc, make, kernel-devel, elfutils-libelf-devel
-Requires: slayerctl
+Requires: slayerctl >= 0.1.2-4
 Requires: kmod-slayerctl-r9t-%{kver} = %{version}-%{release}
 Provides: slayerctl-r9t-kmod-common = %{version}-%{release}
 Obsoletes: slayerctl-r9t-kmod-common < %{version}-%{release}
@@ -28,7 +28,7 @@ runs on installation. The kernel-specific payload remains available for its ABI.
 %package -n kmod-slayerctl-r9t-%{kver}
 Summary: Exact-model Slayer R9T controls and hwmon bridge for %{kver}
 Requires: kernel-uname-r = %{kver}
-Requires: slayerctl
+Requires: slayerctl >= 0.1.2-4
 Provides: kernel-modules-for-kernel = %{kver}
 # The name already includes the kernel ABI: retain different-ABI packages,
 # but upgrade this ABI's payload normally. installonly would co-install two

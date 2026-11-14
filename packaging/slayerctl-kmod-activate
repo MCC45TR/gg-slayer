@@ -25,7 +25,8 @@ if test -z "$(/usr/sbin/modinfo -F signer "$module_file")"; then
   # dedicated akmods service group read access. Resolve those links only
   # inside the protected directories, never an arbitrary link destination.
   for directory in /etc /etc/pki /etc/pki/akmods /etc/pki/akmods/private /etc/pki/akmods/certs; do
-   test -d "$directory" && test ! -L "$directory"
+   test -d "$directory"
+   test ! -L "$directory"
    test "$(stat -c %u "$directory")" = 0
    directory_mode=$(stat -c %a "$directory")
    (( (8#$directory_mode & 022) == 0 ))
@@ -36,7 +37,8 @@ if test -z "$(/usr/sbin/modinfo -F signer "$module_file")"; then
   cert=$(readlink -e "$cert")
   test "$(dirname "$key")" = /etc/pki/akmods/private
   test "$(dirname "$cert")" = /etc/pki/akmods/certs
-  test -f "$key" && test -f "$cert"
+  test -f "$key"
+  test -f "$cert"
   test "$(stat -c %u "$key")" = 0
   test "$(stat -c %u "$cert")" = 0
   key_mode=$(stat -c %a "$key")
@@ -47,7 +49,8 @@ if test -z "$(/usr/sbin/modinfo -F signer "$module_file")"; then
    key_group=$(stat -c %g "$key")
    if test "$key_group" != 0; then
     akmods_group=$(getent group akmods | cut -d: -f3)
-    test -n "$akmods_group" && test "$key_group" = "$akmods_group"
+    test -n "$akmods_group"
+    test "$key_group" = "$akmods_group"
    fi
   fi
   cert_mode=$(stat -c %a "$cert")
