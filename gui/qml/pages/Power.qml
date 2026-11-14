@@ -21,7 +21,7 @@ PageBody {
     }
     Section {
         Layout.fillWidth: true; Layout.alignment: Qt.AlignTop; title: qsTr("Şarj sınırı"); subtitle: qsTr("Yalnız kernelin bildirdiği yüzde eşiği destekleniyorsa kullanılır.")
-        QQC2.SpinBox { id: limit; from: 50; to: 100; value: Number(device.info.battery_limit || 80); enabled: device.ready("battery-limit") && !control.busy; Accessible.name: qsTr("Şarjı durdur (%)"); onValueModified: control.apply(["battery", "limit", String(value)], ["battery_end", String(value)]) }
+        QQC2.SpinBox { id: limit; from: 50; to: 100; value: Number(device.info.battery_limit || 80); visible: device.ready("battery-limit"); enabled: !control.busy; Accessible.name: qsTr("Şarjı durdur (%)"); onValueModified: control.apply(["battery", "limit", String(value)], ["battery_end", String(value)]) }
         QQC2.Label { text: device.reason("battery-limit"); visible: !device.ready("battery-limit"); wrapMode: Text.WordWrap; Layout.fillWidth: true }
     }
     }

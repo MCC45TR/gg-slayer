@@ -17,12 +17,13 @@
 #include <linux/pci.h>
 #include <linux/platform_device.h>
 #include <linux/power_supply.h>
+#include <linux/suspend.h>
 #include <acpi/battery.h>
 #include "profile_bits.h"
 #include "thermal_profile.h"
 #include "model_contract.h"
 #include "mux_transaction.h"
-#define R9T_DRIVER_VERSION "0.1.4"
+#define R9T_DRIVER_VERSION "0.1.5"
 
 static acpi_handle ec;
 static struct platform_device *pdev;
@@ -30,6 +31,9 @@ static struct platform_device *pdev;
 static struct device *hwmon;
 static bool usb_charging_supported;
 static bool event_driver_registered;
+static bool charge_notifier_registered,charge_pm_registered;
+static unsigned int selected_charge_profile;
+static atomic_t charge_ac_online = ATOMIC_INIT(-1);
 static atomic_t event_devices = ATOMIC_INIT(0);
 static u8 last_thermal;
 /* These GPL-exported EC query APIs are declared in drivers/acpi/internal.h.
@@ -301,8 +305,10 @@ static int profile_write(unsigned int value)
 	if (ret || ((old >> 4) & 3) > 2)
 		return ret ? ret : -EPROTO;
 	/* Avoid unnecessary writes, including the default profile on module load. */
-	if (((old >> 4) & 3) == value)
+	if (((old >> 4) & 3) == value) {
+        selected_charge_profile = value;
 		return 0;
+    }
 	input[0].integer.value = 0x07a6;
 	if (slayer_profile_bits(old, value, &next))
 		return -EINVAL;
@@ -310,8 +316,10 @@ static int profile_write(unsigned int value)
 	ret = ACPI_FAILURE(acpi_evaluate_object(ec, "ECRW", &args, NULL)) ? -EIO : 0;
 	if (!ret)
 		ret = profile_read(&observed);
-	if (!ret && observed == value)
+	if (!ret && observed == value) {
+        selected_charge_profile = value;
 		return 0;
+    }
 	/* Only restore these two bits; never overwrite other live firmware flags. */
 	{
 		u8 live_byte;
@@ -326,6 +334,59 @@ static int profile_write(unsigned int value)
 	}
 	return ret ? ret : -EIO;
 }
+/* EC firmware may temporarily reset charge mode on AC transitions. Restore
+ * the last successfully selected mode, including writes through charge_types.
+ * No polling or identity/threshold writes; readback remains real firmware state. */
+static void charge_restore_work(struct work_struct *work)
+{
+    struct power_supply *battery;
+    unsigned int wanted, current;
+    int ret;
+    mutex_lock(&lock);
+    wanted = selected_charge_profile;
+    ret = profile_read(&current);
+    if (!ret && current == wanted) {
+        mutex_unlock(&lock);
+        return;
+    }
+    ret = profile_write(wanted);
+    mutex_unlock(&lock);
+    if (ret) {
+        pr_warn_ratelimited("slayerctl_r9t: charge profile restore failed: %d\n", ret);
+        return;
+    }
+    sysfs_notify(&pdev->dev.kobj, NULL, "charging_profile");
+    /* BAT0 is the fixed battery in the matched BIOS's DSDT. Take a reference
+     * because removal can race a queued adapter notification. */
+    battery = power_supply_get_by_name("BAT0");
+    if (battery) {
+        power_supply_changed(battery);
+        power_supply_put(battery);
+    }
+}
+static DECLARE_DELAYED_WORK(charge_restore, charge_restore_work);
+static int charge_power_event(struct notifier_block *nb, unsigned long event, void *data)
+{
+    struct power_supply *supply = data;
+    union power_supply_propval online;
+    if (event != PSY_EVENT_PROP_CHANGED || supply->desc->type != POWER_SUPPLY_TYPE_MAINS)
+        return NOTIFY_DONE;
+    if (power_supply_get_property(supply, POWER_SUPPLY_PROP_ONLINE, &online))
+        return NOTIFY_DONE;
+    if (atomic_xchg(&charge_ac_online, !!online.intval) != !!online.intval)
+        mod_delayed_work(system_wq, &charge_restore, msecs_to_jiffies(300));
+    return NOTIFY_OK;
+}
+static int charge_resume_event(struct notifier_block *nb, unsigned long event, void *data)
+{
+    if (event == PM_SUSPEND_PREPARE || event == PM_HIBERNATION_PREPARE || event == PM_RESTORE_PREPARE)
+        cancel_delayed_work_sync(&charge_restore);
+    else if (event == PM_POST_SUSPEND || event == PM_POST_HIBERNATION || event == PM_POST_RESTORE)
+        mod_delayed_work(system_wq, &charge_restore, msecs_to_jiffies(300));
+    return NOTIFY_DONE;
+}
+static struct notifier_block charge_power_notifier = { .notifier_call = charge_power_event };
+static struct notifier_block charge_pm_notifier = { .notifier_call = charge_resume_event };
 static const char * const names[] = { "high-capacity", "balanced", "stationary" };
 /* Read-only charging diagnostics for this exact BIOS. No threshold, product
  * identity or platform-gate write is performed or exposed by this attribute. */
@@ -556,6 +617,7 @@ static int __init r9t_init(void)
 		return -ENODEV;
 	if (read_byte(0x0740, &project) || project != 26 || read_byte(0x078e, &support) || !(support & BIT(3)) || profile_read(&profile))
 		return -ENODEV;
+    selected_charge_profile = profile;
 	if (acpi_has_method(ec, "ECRW") == false)
 		return -ENODEV;
 	if (read_byte(0x0766, &support)) return -EIO;
@@ -586,6 +648,12 @@ static int __init r9t_init(void)
  else pr_warn("slayerctl_r9t: WMI event observer unavailable: %d\n", ret);
  attach_query_observer();
  battery_hook_register(&hook);
+ ret = power_supply_reg_notifier(&charge_power_notifier);
+ if (!ret) charge_notifier_registered = true;
+ else pr_warn("slayerctl_r9t: charge adapter observer unavailable: %d\n", ret);
+ ret = register_pm_notifier(&charge_pm_notifier);
+ if (!ret) charge_pm_registered = true;
+ else pr_warn("slayerctl_r9t: charge resume observer unavailable: %d\n", ret);
  ret = input_register_handler(&keyboard_handler);
  if (!ret) keyboard_handler_registered = true;
  else pr_warn("slayerctl_r9t: internal keyboard observer unavailable: %d\n", ret);
@@ -604,6 +672,9 @@ fail:
 static void __exit r9t_exit(void)
 {
  keyboard_activity_exit();
+ if (charge_pm_registered) unregister_pm_notifier(&charge_pm_notifier);
+ if (charge_notifier_registered) power_supply_unreg_notifier(&charge_power_notifier);
+ cancel_delayed_work_sync(&charge_restore);
  if (event_driver_registered) wmi_driver_unregister(&event_driver);
  if (profile_ec) acpi_ec_remove_query_handler(profile_ec, 0x88);
  cancel_delayed_work_sync(&thermal_event);

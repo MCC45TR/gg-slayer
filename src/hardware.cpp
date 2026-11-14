@@ -156,7 +156,7 @@ std::vector<Capability> capabilities(const Io &io) {
         {"rgb","RGB renk / tuş / efekt",key&&io.exists(keys.front().path+"/multi_intensity")?"ready":"blocked","Standart multicolor ABI. Efekt yalnız komut çalışırken CPU kullanır."},
         {"hardware-rgb","Klavyede çalışan RGB efektleri",hardwareDevice(io).empty()?"blocked":"ready","Yalnız R9T / ITE 048d:600b rev0003 arayüz 1; tek LED raporu, flash yazması ve daemon yok."},
         {"accent","KDE vurgu rengi","session","KDE Kameleon; kullanıcı oturumunda sudo olmadan çalışır."},
-        {"battery-limit","Pil dolum alt/üst eşiği",threshold?"ready":"blocked",threshold?"Kernel standart charge_control_* arayüzünü sağlıyor.":"Kernel dolum eşiği sunmuyor; ham EC adresi yazılmaz."},
+        {"battery-limit","Pil dolum alt/üst eşiği",threshold?"ready":"blocked",threshold?"Kernel standart charge_control_* arayüzünü sağlıyor.":"Bu kernel/firmware yüzde şarj sınırı sunmuyor; KDE de yerel yüzde ayarını bu nedenle gösteremez. Koruma profili yüzde eşiği değildir."},
         {"battery-profile","Pil koruma profili",(native("charging_profile")||(!bs.empty()&&io.exists(bs.front()+"/charge_types")))?"ready":"blocked","R9T model/BIOS/proje ve destek bitiyle sınırlı üç profil; yüzde dolum eşiği değildir."},
         {"desktop-power","KDE / GNOME ortak güç profili","session","Mevcut UPower PowerProfiles D-Bus servisi; OEM Turbo/MUX ile aynı ayar değildir."},
         {"performance-sync","KDE / EC performans eşitlemesi",get(io,platform+"/profile_events").starts_with("acpi-query")&&get(io,hardwareProfilePath(io)+"_choices").find("low-power")!=std::string::npos?"ready":"blocked","Güncel R9T Office modu ve WMI olay izleyicisi gerekir; sürekli EC sorgulaması yapılmaz."},
@@ -248,7 +248,7 @@ void battery(const Io &io,const std::vector<std::string>&a) {
     const int end=integer(a[1],50,100,"Üst eşik");
     const int start=a.size()==3?integer(a[2],0,95,"Alt eşik"):-1;
     if(start>=end)throw Error("Alt eşik üst eşikten küçük olmalı.");
-    if(!io.exists(p+"/charge_control_end_threshold"))unverified("Pil dolum eşiği");
+    if(!io.exists(p+"/charge_control_end_threshold"))throw Error("%"+std::to_string(end)+" şarj sınırı uygulanmadı: kernel/firmware standart yüzde eşiği sunmuyor. Koruma profili ayrı bir özelliktir; KDE yerel yüzde ayarı da bu arayüzü gerektirir.",4);
     if(start>=0&&!io.exists(p+"/charge_control_start_threshold"))throw Error("Kernel alt eşik desteği sunmuyor.",4);
     auto oldEnd=get(io,p+"/charge_control_end_threshold"),oldStart=get(io,p+"/charge_control_start_threshold");
     if(oldEnd.empty())throw Error("Mevcut üst eşik okunamadı; işlem iptal edildi.");

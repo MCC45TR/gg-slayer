@@ -5,7 +5,7 @@
 %global kver %(v=$(rpm -q --qf '%%{VERSION}-%%{RELEASE}.%%{ARCH}\\n' kernel-devel 2>/dev/null); if test $? -eq 0; then echo "$v" | sort -V | tail -n1; else echo 0; fi)
 %global copr_build 0
 Name: slayerctl-r9t-kmod
-Version: 0.1.4
+Version: 0.1.5
 Release: 1.%{copr_build}%{?dist}
 Summary: Exact-model Slayer R9T controls and hwmon bridge
 License: GPL-2.0-only

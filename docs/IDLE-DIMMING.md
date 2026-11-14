@@ -55,3 +55,12 @@ hazırlık başarısız olursa hak otomatik bırakılır ve bekleme takibi yenid
 başlar. Kalibrasyon arayüzü DE etkinliğini kendi başına sorgulamaz.
 
 Referans: [Linux input handler ve pasif gözlemci API'si](https://docs.kernel.org/driver-api/input.html).
+
+KDE'de ctl oturum köprüsü PowerDevil'in `ChangeKeyboardBacklight` (8) hakkını
+alır. Bu hak ekranı açık tutmaz, ekran kısılmasını veya uykuyu engellemez;
+yalnız PowerDevil'in DimDisplay/DPMS işlemlerinin klavyeyi sıfırlamasını önler.
+Elle seçilen sıfır dahil normal KDE parlaklık ayarı çalışmaya devam eder.
+Hak bağlantı kopunca otomatik bırakılır; PowerDevil yeniden başlayınca ctl
+tekrar alır. Özellik kapatıldığında veya güç tasarrufundan çıkıldığında bırakılır.
+Gerekli PowerDevil uzantısı aynı COPR'dan sağlanır. Kurulu KDE bu arayüzü
+sunmuyorsa ctl oturum durumu eksik entegrasyonu açıkça bildirir.

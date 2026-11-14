@@ -216,7 +216,8 @@ class Hardware(unittest.TestCase):
         (self.root/'sys/class/power_supply/BAT0/charge_control_end_threshold').unlink()
         (self.root/'sys/firmware/acpi/platform_profile').unlink()
         old=self.snap()
-        self.runcli('battery','limit','80',ok=False)
+        error = self.runcli('battery','limit','80',ok=False)
+        self.assertIn('%80 şarj sınırı uygulanmadı', error)
         self.runcli('profile','set','balanced',ok=False)
         self.assertEqual(old,self.snap())
     def test_helper_rejects_fixture(self):
