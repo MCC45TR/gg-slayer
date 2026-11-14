@@ -75,8 +75,33 @@ index db71ca8..2412522 100644
      <method name="AddInhibition">
        <arg name="types" type="u" direction="in" />
        <arg name="app_name" type="s" direction="in" />
+diff --git a/daemon/powerdevilcore.cpp b/daemon/powerdevilcore.cpp
+index fabcc67..9034c2c 100644
+--- a/daemon/powerdevilcore.cpp
++++ b/daemon/powerdevilcore.cpp
+@@ -138,12 +138,16 @@ void Core::onControllersReady()
+     connect(PowerDevil::PolicyAgent::instance(),
+             &PowerDevil::PolicyAgent::unavailablePoliciesChanged,
+             this,
+-            [](PowerDevil::PolicyAgent::RequiredPolicies newPolicies) {
+-                Q_UNUSED(newPolicies);
+-                KIdleTime::instance()->simulateUserActivity();
++            [previous = PolicyAgent::instance()->unavailablePolicies()](PolicyAgent::RequiredPolicies newPolicies) mutable {
++                const auto screenAndSleep = PolicyAgent::RequiredPolicies(PolicyAgent::InterruptSession) | PolicyAgent::ChangeScreenSettings;
++                const bool changed = (previous & screenAndSleep) != (newPolicies & screenAndSleep);
++                previous = newPolicies;
++                if (changed) {
++                    KIdleTime::instance()->simulateUserActivity();
++                }
+             });
+     // Refresh action timers during inhibition change, to avoid timers reaching zero right after inhibitions end.
+-    connect(PowerDevil::PolicyAgent::instance(), &PowerDevil::PolicyAgent::InhibitionsChanged, this, [this]() {
++    connect(PowerDevil::PolicyAgent::instance(), &PowerDevil::PolicyAgent::screenAndSleepInhibitionsChanged, this, [this]() {
+         qCDebug(POWERDEVIL) << "Refreshing timers for actions on inhibitionsChanged";
+         for (const QString &action : std::as_const(m_activeActions)) {
+             const auto timeouts = m_actionPool[action]->m_registeredIdleTimeouts;
 diff --git a/daemon/powerdevilpolicyagent.cpp b/daemon/powerdevilpolicyagent.cpp
-index 8ed1edc..ecc2af6 100644
+index 8ed1edc..e784d15 100644
 --- a/daemon/powerdevilpolicyagent.cpp
 +++ b/daemon/powerdevilpolicyagent.cpp
 @@ -444,6 +444,9 @@ QString PolicyAgent::logindWhatForPolicies(PolicyAgent::RequiredPolicies policie
@@ -120,7 +145,27 @@ index 8ed1edc..ecc2af6 100644
          qCDebug(POWERDEVIL) << "Enforcing inhibition from" << service << inhibition.who << "with cookie" << cookie << "and reason" << inhibition.why;
 
          if (!m_pendingInhibitions.contains(cookie)) {
-@@ -724,6 +735,11 @@ void PolicyAgent::addInhibitionTypeHelper(uint cookie, PolicyAgent::RequiredPoli
+@@ -668,6 +679,9 @@ uint PolicyAgent::addInhibitionWithExplicitDBusService(uint types, const QString
+                             m_activeInhibitions.insert(cookie);
+                             Q_EMIT dbusPropertiesChanged({u"RequestedInhibitions"_s, u"ActiveInhibitions"_s});
+                             Q_EMIT InhibitionsChanged({{QStringList{inhibition.who, inhibition.why}}}, {});
++                            if (inhibition.policies & (RequiredPolicies(InterruptSession) | ChangeScreenSettings)) {
++                                Q_EMIT screenAndSleepInhibitionsChanged();
++                            }
+                         }
+                     }));
+
+@@ -688,6 +702,9 @@ uint PolicyAgent::addInhibitionWithExplicitDBusService(uint types, const QString
+         m_activeInhibitions.insert(cookie);
+         Q_EMIT dbusPropertiesChanged({u"RequestedInhibitions"_s, u"ActiveInhibitions"_s});
+         Q_EMIT InhibitionsChanged({{QStringList{inhibition.who, inhibition.why}}}, {});
++        if (inhibition.policies & (RequiredPolicies(InterruptSession) | ChangeScreenSettings)) {
++            Q_EMIT screenAndSleepInhibitionsChanged();
++        }
+     });
+
+     return cookie;
+@@ -724,6 +741,11 @@ void PolicyAgent::addInhibitionTypeHelper(uint cookie, PolicyAgent::RequiredPoli
          m_typesToCookie[InterruptSession].append(cookie);
      }
 
@@ -132,7 +177,17 @@ index 8ed1edc..ecc2af6 100644
      if (notify) {
          // emit the signal - inhibition has changed
          Q_EMIT unavailablePoliciesChanged(unavailablePolicies());
-@@ -786,6 +802,10 @@ void PolicyAgent::ReleaseInhibition(uint cookie, bool retainCookie)
+@@ -768,6 +790,9 @@ void PolicyAgent::ReleaseInhibition(uint cookie, bool retainCookie)
+     }
+     Q_EMIT dbusPropertiesChanged({u"RequestedInhibitions"_s, u"ActiveInhibitions"_s});
+     Q_EMIT InhibitionsChanged(QList<QStringList>(), {{inhibition.who}});
++    if (inhibition.policies & (RequiredPolicies(InterruptSession) | ChangeScreenSettings)) {
++        Q_EMIT screenAndSleepInhibitionsChanged();
++    }
+
+     // Look through all of the inhibition types
+     bool notify = false;
+@@ -786,6 +811,10 @@ void PolicyAgent::ReleaseInhibition(uint cookie, bool retainCookie)
          }
      }
 
@@ -144,7 +199,7 @@ index 8ed1edc..ecc2af6 100644
          // Emit the signal - inhibition has changed
          Q_EMIT unavailablePoliciesChanged(unavailablePolicies());
 diff --git a/daemon/powerdevilpolicyagent.h b/daemon/powerdevilpolicyagent.h
-index 41c8b45..105fd5a 100644
+index 41c8b45..1007931 100644
 --- a/daemon/powerdevilpolicyagent.h
 +++ b/daemon/powerdevilpolicyagent.h
 @@ -79,14 +79,19 @@ class POWERDEVILCORE_EXPORT PolicyAgent : public QObject, protected QDBusContext
@@ -167,3 +222,11 @@ index 41c8b45..105fd5a 100644
      static PolicyAgent *instance();
 
      ~PolicyAgent() override;
+@@ -121,6 +126,7 @@ Q_SIGNALS:
+     void dbusPropertiesChanged(const QStringList &props);
+     void InhibitionsChanged(const QList<QStringList> &added, const QStringList &removed); // DEPRECATED: array of {who, why} in `added`
+
++    void screenAndSleepInhibitionsChanged();
+     void unavailablePoliciesChanged(PowerDevil::PolicyAgent::RequiredPolicies newpolicies);
+     void sessionActiveChanged(bool active);
+     void screenLockerActiveChanged(bool active);

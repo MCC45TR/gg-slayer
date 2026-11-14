@@ -1,6 +1,6 @@
 Name:    powerdevil
 Version: 6.8.3
-Release: 2.slayer1%{?dist}
+Release: 2.slayer2%{?dist}
 Packager: MCC45TR <mcc45tr@gmail.com>
 Provides: powerdevil-keyboard-idle-inhibition = 1
 Summary: Manages the power consumption settings of a Plasma Shell
@@ -147,9 +147,10 @@ rm -fv %{buildroot}/%{_libdir}/libpowerdevil{configcommonprivate,core,ui}.so
 
 
 %changelog
-* Sat Nov 14 2026 MCC45TR <mcc45tr@gmail.com> - 6.8.3-2.slayer1
+* Sat Nov 14 2026 MCC45TR <mcc45tr@gmail.com> - 6.8.3-2.slayer2
 - Add independent keyboard-only idle delegation through PolicyAgent.
 - Retain native screen dimming, suspend and explicit brightness controls.
+- Keyboard delegation does not simulate global activity or reset screen timers.
 
 * Thu Nov 12 2026 Steve Cossette <farchord@gmail.com> - 6.8.3-1
 - Fedora 6.8.3 packaging base.
