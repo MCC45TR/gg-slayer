@@ -1,6 +1,6 @@
 Name:           slayerctl
 Version:        0.1.3
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        Game Garaj Slayer hardware control backend
 License:        MIT AND LGPL-2.1-or-later
 URL:            https://github.com/MCC45TR/gg-slayer
@@ -150,6 +150,8 @@ desktop-file-validate %{buildroot}%{_datadir}/applications/slayer-control-gtk.de
 %{_datadir}/applications/slayer-control-gtk.desktop
 
 %changelog
+* Sat Nov 14 2026 MCC45TR <mcc45tr@gmail.com> - 0.1.3-2
+- Ship the internal-keyboard backend with charging diagnostic support in R9T.
 * Sat Nov 14 2026 MCC45TR <mcc45tr@gmail.com> - 0.1.3-1
 - Track only the built-in AT keyboard through a root-only activity timestamp.
 - Keep idle lighting at the first optically visible 4 percent level.

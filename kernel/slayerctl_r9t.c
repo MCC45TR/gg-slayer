@@ -22,7 +22,7 @@
 #include "thermal_profile.h"
 #include "model_contract.h"
 #include "mux_transaction.h"
-#define R9T_DRIVER_VERSION "0.1.2"
+#define R9T_DRIVER_VERSION "0.1.3"
 
 static acpi_handle ec;
 static struct platform_device *pdev;
@@ -327,6 +327,25 @@ static int profile_write(unsigned int value)
 	return ret ? ret : -EIO;
 }
 static const char * const names[] = { "high-capacity", "balanced", "stationary" };
+/* Read-only charging diagnostics for this exact BIOS. No threshold, product
+ * identity or platform-gate write is performed or exposed by this attribute. */
+static ssize_t charge_threshold_diagnostics_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+ static const u16 addresses[] = { 0x0742, 0x0770, 0x07c3, 0x07b9, 0x07d0, 0x087f };
+ u8 values[ARRAY_SIZE(addresses)];
+ unsigned int i;
+ int ret = 0;
+ mutex_lock(&lock);
+ for (i = 0; i < ARRAY_SIZE(addresses); i++) {
+  ret = read_byte(addresses[i], &values[i]);
+  if (ret) break;
+ }
+ mutex_unlock(&lock);
+ if (ret) return ret;
+ return sysfs_emit(buf, "support5=0x%02x romid0=0x%02x platform=0x%02x upper=0x%02x lower=0x%02x stored_h2ram=0x%02x\n",
+                   values[0], values[1], values[2], values[3], values[4], values[5]);
+}
+static DEVICE_ATTR(charge_threshold_diagnostics, 0400, charge_threshold_diagnostics_show, NULL);
 static ssize_t charging_profile_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	unsigned int value;
@@ -357,7 +376,8 @@ static DEVICE_ATTR_RO(charging_profiles_available);
 static ssize_t backend_version_show(struct device *dev, struct device_attribute *attr, char *buf)
 { return sysfs_emit(buf, R9T_DRIVER_VERSION " R9T-IDK26-N.1.46GAR16\n"); }
 static DEVICE_ATTR_RO(backend_version);
-static struct attribute *attrs[] = { &dev_attr_keyboard_activity.attr, &dev_attr_keyboard_activity_present.attr,
+static struct attribute *attrs[] = { &dev_attr_charge_threshold_diagnostics.attr,
+ &dev_attr_keyboard_activity.attr, &dev_attr_keyboard_activity_present.attr,
  &dev_attr_keyboard_activity_monitor.attr, &dev_attr_keyboard_activity_arm.attr,
  &dev_attr_profile_event_count.attr, &dev_attr_thermal_mode.attr, &dev_attr_thermal_mode_choices.attr, &dev_attr_profile_events.attr, &dev_attr_thermal_control.attr, &dev_attr_backend_version.attr, &dev_attr_charging_profile.attr,
 	&dev_attr_charging_profiles_available.attr, &dev_attr_fn_lock.attr,
