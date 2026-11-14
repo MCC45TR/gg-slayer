@@ -353,8 +353,8 @@ static int charge_mailbox_read(u16 address, u32 *value)
 {
  u8 bytes[40] = { 0 };
  union acpi_object params[3] = {
-  { .type = ACPI_TYPE_INTEGER, .integer.value = 0 },
-  { .type = ACPI_TYPE_INTEGER, .integer.value = 4 },
+  { .integer = { .type = ACPI_TYPE_INTEGER, .value = 0 } },
+  { .integer = { .type = ACPI_TYPE_INTEGER, .value = 4 } },
   { .type = ACPI_TYPE_BUFFER },
  };
  struct acpi_object_list args = { .count = 3, .pointer = params };
@@ -364,9 +364,11 @@ static int charge_mailbox_read(u16 address, u32 *value)
  bytes[0] = address & 0xff; bytes[1] = address >> 8;
  bytes[5] = 1;
  params[2].buffer.length = sizeof(bytes); params[2].buffer.pointer = bytes;
- if (ACPI_FAILURE(acpi_evaluate_object(NULL, "\\_SB.AMW0.WMBC", &args, &result))) return -EIO;
+ if (ACPI_FAILURE(acpi_evaluate_object(NULL, "\\_SB.AMW0.WMBC", &args, &result))) {
+  ACPI_FREE(result.pointer); return -EIO;
+ }
  object = result.pointer;
- if (object && object->type == ACPI_TYPE_BUFFER && object->buffer.length >= 4) {
+ if (object && object->type == ACPI_TYPE_BUFFER && object->buffer.pointer && object->buffer.length >= 4) {
   const u8 *b = object->buffer.pointer;
   *value = (u32)b[0] | (u32)b[1] << 8 | (u32)b[2] << 16 | (u32)b[3] << 24;
   if (*value != 0xfefefefe && *value != 0xffffffff) ret = 0;

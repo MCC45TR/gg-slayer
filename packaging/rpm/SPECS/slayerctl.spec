@@ -1,6 +1,6 @@
 Name:           slayerctl
 Version:        0.1.3
-Release:        3%{?dist}
+Release:        4%{?dist}
 Summary:        Game Garaj Slayer hardware control backend
 License:        MIT AND LGPL-2.1-or-later
 URL:            https://github.com/MCC45TR/gg-slayer
@@ -150,6 +150,8 @@ desktop-file-validate %{buildroot}%{_datadir}/applications/slayer-control-gtk.de
 %{_datadir}/applications/slayer-control-gtk.desktop
 
 %changelog
+* Sat Nov 14 2026 MCC45TR <mcc45tr@gmail.com> - 0.1.3-4
+- Keep explicit ACPI object types in the read-only diagnostic mailbox request.
 * Sat Nov 14 2026 MCC45TR <mcc45tr@gmail.com> - 0.1.3-3
 - Pair the updated ctl packages with read-only native charging diagnostics.
 * Sat Nov 14 2026 MCC45TR <mcc45tr@gmail.com> - 0.1.3-2
