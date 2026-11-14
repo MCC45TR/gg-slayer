@@ -48,10 +48,10 @@ PageBody {
     Section {
         Layout.fillWidth: true
         title: qsTr("Güç tasarrufunda bekleme")
-        subtitle: qsTr("Kullanılmadığında ışık beş saniyede en düşük seviyeye iner. Dokunduğunuzda seçili parlaklığa yumuşakça döner. Kapalı klavye kapalı kalır.")
+        subtitle: qsTr("Yerleşik klavye kullanılmadığında ışık beş saniyede %4 seviyesine iner. Yerleşik klavyeye bastığınızda seçili parlaklığa döner. Kapalı klavye kapalı kalır.")
         Setting {
             title: qsTr("Beklemede ışığı kıs")
-            description: qsTr("Yalnızca güç tasarrufu profilinde çalışır. Masaüstünün parlaklık değeri değişmez.")
+            description: qsTr("Yalnızca güç tasarrufunda çalışır. Harici klavye ve fare ışığı uyandırmaz. Masaüstünün parlaklık değeri değişmez.")
             options: ["on", "off"]; labels: [qsTr("Açık"), qsTr("Kapalı")]
             current: device.info.saved_keyboard_idle_dim || "off"
             enabled: device.info.keyboard_idle_available === "1"

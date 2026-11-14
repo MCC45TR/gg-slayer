@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 #include "command.hpp"
 #include "idle_dimmer.hpp"
+#include "internal_keyboard.hpp"
 #include "../src/controls.hpp"
 #include "../src/profile_sync.hpp"
 #include <QCoreApplication>
@@ -37,6 +38,7 @@ class Service final:public QObject,protected QDBusContext {
     bool authorizing=false;
     bool syncEnabled=false;
     IdleDimmer dimmer;
+    InternalKeyboard keyboardActivity;
     QString idleOwner,desktopProfile;
     QStringList desktopChoices;
     bool powerAvailable=false,idleEnabled=false,asleep=false;
@@ -60,7 +62,18 @@ class Service final:public QObject,protected QDBusContext {
         const bool match=uid.isValid()&&sd_seat_get_active("seat0",&session,&active)>=0&&active!=0&&active==uid.value();
         free(session);return match;
     }
-    void releaseIdle(){idleOwner.clear();dimmer.reset();}
+    void refreshActivity(){
+        uid_t uid=0;char* session=nullptr;
+        const bool active=sd_seat_get_active("seat0",&session,&uid)>=0&&uid!=0;
+        free(session);
+        QFile brightness("/sys/class/leds/rgb:kbd_backlight/brightness");
+        const bool lit=brightness.open(QIODevice::ReadOnly)&&brightness.read(16).trimmed().toUInt()>0;
+        keyboardActivity.configure(idleEnabled&&!asleep&&desktopProfile=="power-saver"&&
+            idleOwner.isEmpty()&&active&&lit&&dimmer.available(),idleTimeout);
+        if(!lit)dimmer.reset();
+        touch();
+    }
+    void releaseIdle(){idleOwner.clear();dimmer.reset();refreshActivity();}
     void activateSession(){QProcess::startDetached("/usr/libexec/slayerctl-desktop",{"--reload-session"});}
     QString syncOrigin,syncError,expectedDesktop,expectedHardware;
     void reloadSync(){
@@ -69,6 +82,7 @@ class Service final:public QObject,protected QDBusContext {
         idleEnabled=settings.contains("keyboard_idle_dim")&&settings.at("keyboard_idle_dim")=="on";
         idleTimeout=settings.contains("keyboard_idle_timeout")?unsigned(std::stoi(settings.at("keyboard_idle_timeout"))):30u;
         if(!idleEnabled)dimmer.fade(false);
+        refreshActivity();
         const bool newlyEnabled=enabled&&!syncEnabled;
         syncEnabled=enabled;
         if(!enabled){syncError.clear();expectedDesktop.clear();expectedHardware.clear();syncOrigin.clear();}
@@ -98,19 +112,22 @@ class Service final:public QObject,protected QDBusContext {
         else {expectedHardware.clear();syncOrigin="hardware";}
         changed();
     }
-    void touch(){if(subscribers.isEmpty()&&!authorizing&&!syncEnabled)idle.start(30000);else idle.stop();}
+    void touch(){if(subscribers.isEmpty()&&!authorizing&&!syncEnabled&&!keyboardActivity.active())idle.start(30000);else idle.stop();}
     QString state(){
         auto r=ctlCommand({"ui-data"});if(!r.ok)return {};
         for(const auto& [key,value]:settings)r.output+="value\tsaved_"+QString::fromStdString(key)+"\t"+QString::fromStdString(slayer::displayText(value))+"\n";
         if(!settingsError.isEmpty())r.output+="value\tconfig_error\t"+settingsError+"\n";
         r.output+="value\tdesktop_profile\t"+desktopProfile+"\nvalue\tdesktop_choices\t"+desktopChoices.join(u' ')+"\nvalue\tdesktop_available\t"+(powerAvailable?"1":"0")+"\n";
-        r.output+="value\tkeyboard_idle_available\t"+(dimmer.available()?QString("1"):QString("0"))+"\n";
+        r.output+="value\tkeyboard_idle_available\t"+(dimmer.available()&&keyboardActivity.available()?QString("1"):QString("0"))+"\n";
+        if(!keyboardActivity.error().isEmpty())r.output+="value\tkeyboard_idle_error\t"+keyboardActivity.error()+"\n";
         if(!syncError.isEmpty())r.output+="value\tperformance_sync_error\t"+QString::fromStdString(slayer::displayText(syncError.toStdString()))+"\n";
         cached=r.output;return cached;
     }
     void changed(){cached.clear();debounce.start(150);}
 public:
     Service(){
+        connect(&keyboardActivity,&InternalKeyboard::idleChanged,this,[this](bool value){dimmer.fade(value);});
+        connect(&keyboardActivity,&InternalKeyboard::statusChanged,this,[this]{cached.clear();Q_EMIT SessionSettingsChanged();});
         clients.setConnection(QDBusConnection::systemBus());clients.setWatchMode(QDBusServiceWatcher::WatchForUnregistration);
         connect(&clients,&QDBusServiceWatcher::serviceUnregistered,this,[this](const QString& name){if(name==idleOwner)releaseIdle();subscribers.remove(name);clients.removeWatchedService(name);touch();});
         idle.setSingleShot(true);connect(&idle,&QTimer::timeout,qApp,&QCoreApplication::quit);touch();
@@ -126,7 +143,7 @@ public:
                 while((n=recvfrom(socketFd,buffer,sizeof(buffer),0,reinterpret_cast<sockaddr*>(&sender),&len))>0){
                     if(sender.nl_pid!=0)continue;
                     QByteArray data(buffer,static_cast<qsizetype>(n));
-                    if(data.contains("SUBSYSTEM=platform-profile")||data.contains("/devices/platform/slayerctl")){hardwareChanged();continue;}
+                    if(data.contains("SUBSYSTEM=platform-profile")||data.contains("/devices/platform/slayerctl")){refreshActivity();hardwareChanged();continue;}
                     if(data.contains("SUBSYSTEM=power_supply")||data.contains("SUBSYSTEM=platform-profile")||data.contains("SUBSYSTEM=leds")||data.contains("/devices/platform/slayerctl"))changed();
                     else if(data.contains("SUBSYSTEM=hid")&&data.contains("HID_ID=0003:0000048D:0000600B"))changed();
                 }
@@ -138,17 +155,18 @@ public:
         QDBusConnection::systemBus().connect("org.freedesktop.login1","/org/freedesktop/login1","org.freedesktop.login1.Manager","PrepareForSleep",this,SLOT(prepareForSleep(bool)));
         QTimer::singleShot(0,this,[this]{readPower();reloadSync();reconcile();activateSession();});
     }
-    ~Service()override{dimmer.reset();if(socketFd>=0)close(socketFd);}
+    ~Service()override{keyboardActivity.stop();dimmer.reset();if(socketFd>=0)close(socketFd);}
 private Q_SLOTS:
-    void seatChanged(const QString&,const QVariantMap& values,const QStringList&){if(values.contains("ActiveSession")&&!idleOwner.isEmpty()&&!activeUser(idleOwner))releaseIdle();}
-    void prepareForSleep(bool sleeping){asleep=sleeping;if(sleeping)releaseIdle();Q_EMIT SessionSettingsChanged();}
-    void keyboardBrightnessChanged(int){changed();}
+    void seatChanged(const QString&,const QVariantMap& values,const QStringList&){if(values.contains("ActiveSession")){if(!idleOwner.isEmpty()&&!activeUser(idleOwner))releaseIdle();else refreshActivity();}}
+    void prepareForSleep(bool sleeping){asleep=sleeping;if(sleeping)releaseIdle();else refreshActivity();Q_EMIT SessionSettingsChanged();}
+    void keyboardBrightnessChanged(int){refreshActivity();changed();}
     void powerChanged(const QString& interface,const QVariantMap& values,const QStringList& invalidated){
         if(interface!="org.freedesktop.UPower.PowerProfiles"||(!values.contains("ActiveProfile")&&!invalidated.contains("ActiveProfile")))return;
         const auto value=values.value("ActiveProfile").toString();
         desktopProfile=value;powerAvailable=true;
         if(value.isEmpty()||invalidated.contains("ActiveProfile"))readPower();
         if(desktopProfile!="power-saver")dimmer.fade(false);
+        refreshActivity();
         Q_EMIT SessionSettingsChanged();
         if(!expectedDesktop.isEmpty()&&value==expectedDesktop)expectedDesktop.clear();
         else {expectedDesktop.clear();syncOrigin="desktop";}
@@ -158,19 +176,9 @@ public Q_SLOTS:
     QVariantMap ReadSessionSettings(){
         touch();
         return {{"enabled",idleEnabled},{"timeout",idleTimeout},{"powerSaver",desktopProfile=="power-saver"},{"sleeping",asleep},
-            {"available",dimmer.available()},{"lightingOwner",QString::fromStdString(settings.contains("lighting_owner")?settings.at("lighting_owner"):"")}};
-    }
-    bool IdleChanged(bool isIdle){
-        if(!calledFromDBus())return false;
-        const auto sender=message().service();
-        // Two notifications per idle cycle. No authorization subprocess, TPM
-        // access, device enumeration or D-Bus traffic on animation ticks.
-        if(!activeUser(sender))return false;
-        if(isIdle&&(!idleEnabled||asleep||desktopProfile!="power-saver"))return false;
-        if(!idleOwner.isEmpty()&&idleOwner!=sender)return false;
-        if(!isIdle&&idleOwner.isEmpty())return true;
-        idleOwner=sender;clients.addWatchedService(sender);
-        return dimmer.fade(isIdle);
+            {"available",dimmer.available()&&keyboardActivity.available()},{"armed",keyboardActivity.active()},
+            {"idle",keyboardActivity.idle()},{"backend",QStringLiteral("internal-keyboard")},{"idleError",keyboardActivity.error()},
+            {"lightingOwner",QString::fromStdString(settings.contains("lighting_owner")?settings.at("lighting_owner"):"")}};
     }
     bool PrepareCalibration(){
         if(!calledFromDBus())return false;
@@ -179,11 +187,16 @@ public Q_SLOTS:
         // Older drivers have no transient scale and need no fade barrier.
         if(!dimmer.available())return true;
         idleOwner=sender;clients.addWatchedService(sender);
+        keyboardActivity.configure(false,idleTimeout);
         const auto request=message();setDelayedReply(true);
         dimmer.restore([this,request](bool ok){
             QDBusConnection::systemBus().send(request.createReply(QVariantList{ok&&activeUser(request.service())}));
         });
         return false;
+    }
+    bool FinishCalibration(){
+        if(!calledFromDBus()||message().service()!=idleOwner)return false;
+        releaseIdle();Q_EMIT SessionSettingsChanged();return true;
     }
     void Subscribe(){if(!calledFromDBus()||subscribers.size()>=16)return;const auto sender=message().service();subscribers.insert(sender);clients.addWatchedService(sender);touch();}
     void Unsubscribe(){if(!calledFromDBus())return;const auto sender=message().service();subscribers.remove(sender);if(sender!=idleOwner)clients.removeWatchedService(sender);touch();}

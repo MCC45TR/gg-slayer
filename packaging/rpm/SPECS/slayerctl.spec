@@ -1,6 +1,6 @@
 Name:           slayerctl
-Version:        0.1.2
-Release:        4%{?dist}
+Version:        0.1.3
+Release:        1%{?dist}
 Summary:        Game Garaj Slayer hardware control backend
 License:        MIT AND LGPL-2.1-or-later
 URL:            https://github.com/MCC45TR/gg-slayer
@@ -10,7 +10,7 @@ BuildRequires:  gcc-c++, cmake, make, ninja-build, python3-devel
 BuildRequires:  openssl-devel
 BuildRequires:  qt6-qtbase-devel, qt6-qtdeclarative-devel, extra-cmake-modules
 BuildRequires:  kf6-kcmutils-devel, pkgconfig(xkbcommon), pkgconfig(wayland-client)
-BuildRequires:  pkgconfig(libsystemd), pkgconfig(x11), pkgconfig(xext), wayland-devel
+BuildRequires:  pkgconfig(libsystemd)
 BuildRequires:  systemd-rpm-macros, desktop-file-utils, breeze-icon-theme
 BuildRequires:  kf6-kirigami, kf6-qqc2-desktop-style, qt6-qtimageformats
 BuildRequires:  desktop-backgrounds-kde, xkeyboard-config
@@ -150,6 +150,10 @@ desktop-file-validate %{buildroot}%{_datadir}/applications/slayer-control-gtk.de
 %{_datadir}/applications/slayer-control-gtk.desktop
 
 %changelog
+* Sat Nov 14 2026 MCC45TR <mcc45tr@gmail.com> - 0.1.3-1
+- Track only the built-in AT keyboard through a root-only activity timestamp.
+- Keep idle lighting at the first optically visible 4 percent level.
+- Remove global Wayland/GNOME/X11 input watching from the session bridge.
 * Sat Nov 14 2026 MCC45TR <mcc45tr@gmail.com> - 0.1.2-4
 - Sign remote modules using the protected links and permissions from kmodgenca.
 * Sat Nov 14 2026 MCC45TR <mcc45tr@gmail.com> - 0.1.2-1

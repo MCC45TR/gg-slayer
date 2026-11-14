@@ -25,7 +25,7 @@ case "$spec_name" in
   ;;
  slayerctl-r9t-kmod.spec)
   stage="$work/r9t";mkdir -p "$stage"
-  for file in slayerctl_r9t.c model_contract.h firmware_contract.h profile_bits.h mux_transaction.h thermal_profile.h; do cp "$root/kernel/$file" "$stage/"; done
+  for file in slayerctl_r9t.c model_contract.h firmware_contract.h profile_bits.h mux_transaction.h thermal_profile.h internal_keyboard.h internal_keyboard_contract.h; do cp "$root/kernel/$file" "$stage/"; done
   cp "$root/kernel/COPYING" "$stage/COPYING"
   printf 'obj-m += slayerctl_r9t.o\n' > "$stage/Kbuild"
   tar -czf "$work/SOURCES/slayerctl_r9t.tar.gz" -C "$stage" .

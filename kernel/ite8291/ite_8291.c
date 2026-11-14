@@ -872,6 +872,9 @@ out:
 	return ret ? ret : size;
 }
 static DEVICE_ATTR_RW(brightness_scale);
+static ssize_t brightness_minimum_show(struct device *device, struct device_attribute *attr, char *buf)
+{ return sysfs_emit(buf, "2\n"); }
+static DEVICE_ATTR_RO(brightness_minimum);
 static ssize_t transfer_stats_show(struct device *device, struct device_attribute *attr, char *buf)
 {
 	struct ite8291_driver_data_t *d = hid_get_drvdata(to_hid_device(device));
@@ -985,6 +988,7 @@ static struct attribute *control_group_attrs[] = {
 	&dev_attr_buffer_input.attr,
 	&dev_attr_hardware_effect.attr,
 	&dev_attr_brightness_scale.attr,
+	&dev_attr_brightness_minimum.attr,
 	&dev_attr_transfer_stats.attr,
 	&dev_attr_frame_color.attr,
 	&dev_attr_white_point.attr,
@@ -1138,4 +1142,4 @@ MODULE_AUTHOR("TUXEDO Computers GmbH <tux@tuxedocomputers.com>");
 MODULE_DESCRIPTION("Driver for ITE Device(8291) RGB LED keyboard backlight.");
 MODULE_LICENSE("GPL");
 
-MODULE_VERSION("0.0.20261114.1");
+MODULE_VERSION("0.0.20261114.2");

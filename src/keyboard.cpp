@@ -30,6 +30,10 @@ static std::array<int,3> parseColor(std::string s) {
 void keyboard(const Io &io,const std::vector<std::string>&a) {
     if(a==std::vector<std::string>{"idle-reset"}){
         if(geteuid()!=0&&!io.fixture())throw Error("Geçici parlaklık ölçeğini yalnız servis sıfırlayabilir.",3);
+        for(const auto& name:{"keyboard_activity_arm","keyboard_activity_monitor"}){
+            const std::string path=std::string("/sys/devices/platform/slayerctl/")+name;
+            if(io.exists(path))io.write(path,"0\n");
+        }
         for(const auto& name:io.list("/sys/bus/hid/devices"))if(name.starts_with("0003:048D:600B.")){
             const auto path="/sys/bus/hid/devices/"+name+"/controls/brightness_scale";
             if(io.exists(path))io.write(path,"1000\n");

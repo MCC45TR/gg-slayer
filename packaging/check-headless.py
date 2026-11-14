@@ -5,6 +5,6 @@ import subprocess
 import sys
 for binary in sys.argv[1:]:
     dependencies = subprocess.check_output(['readelf', '-d', binary], text=True)
-    for library in ('Qt6Gui', 'Qt6Widgets', 'Qt6Quick', 'Qt6Qml', 'KF6'):
+    for library in ('Qt6Gui', 'Qt6Widgets', 'Qt6Quick', 'Qt6Qml', 'KF6', 'libwayland-client', 'libX11', 'libXext'):
         assert library not in dependencies, (binary, library)
-print('ctl executables have no GUI, QML, Kirigami or KDE framework linkage.')
+print('ctl executables have no GUI, QML, Kirigami, KDE framework or display-server linkage.')

@@ -32,7 +32,11 @@ IdleDimmer::IdleDimmer(QObject* parent):QObject(parent) {
     reset();
 }
 IdleDimmer::~IdleDimmer(){reset();}
-bool IdleDimmer::available() const{return !scalePath().isEmpty();}
+bool IdleDimmer::available() const{
+    const auto path=scalePath();if(path.isEmpty())return false;
+    QFile minimum(QFileInfo(path).path()+"/brightness_minimum");
+    return minimum.open(QIODevice::ReadOnly)&&minimum.read(16).trimmed()=="2";
+}
 bool IdleDimmer::writeScale(int value){
     if(value==current&&fd>=0)return true;
     if(fd<0){const auto path=scalePath();if(path.isEmpty())return false;fd=open(QFile::encodeName(path).constData(),O_WRONLY|O_CLOEXEC|O_NOFOLLOW);if(fd<0)return false;}

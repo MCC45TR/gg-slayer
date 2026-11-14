@@ -15,25 +15,36 @@ slayerctl idle off
 Süreler: 5, 10, 15, 30, 60, 120, 180, 300, 600, 900, 1200, 1800 saniye.
 Varsayılan süre 30 saniye. Özellik açıkken yalnız masaüstünün `power-saver`
 profilinde etkinlik izlenir. Seçili parlaklık sıfırsa ışık kapalı kalır;
-pozitifse beş saniyelik smoothstep geçişiyle donanımın en düşük pozitif
-seviyesine iner. Klavye/fare/dokunmatik etkinliği beş saniyede seçili seviyeye
-geri döndürür. Geçiş sırasında etkinlik gelirse bulunduğu seviyeden döner.
+pozitifse beş saniyelik smoothstep geçişiyle donanımda görünür olan **2/50 (%4)**
+seviyesine iner. Bu cihazda 1/50 (%2) optik olarak kapalıdır; pozitif değerler
+bu yüzden en az 2/50 uygulanır. Yalnız laptopun yerleşik klavyesindeki basış,
+ışığı beş saniyede seçili seviyeye geri döndürür. Harici USB/Bluetooth klavye,
+fare ve touchpad uyanmayı veya bekleme süresini etkilemez. Geçiş sırasında
+yerleşik klavyeye basılırsa bulunduğu seviyeden döner.
 
 Sürücünün `controls/brightness_scale` özelliği yalnız geçici fiziksel ölçeği
 değiştirir. LED sınıfı parlaklığı ve KDE/UPower değeri korunur; bu yol parlaklık
 bildirimi veya OSD üretmez. RGB verisi ve donanım efektleri yeniden gönderilmez.
-En fazla 49 USB parlaklık değişikliği bir geçiş için yeterlidir; yerleşik
+En fazla 48 USB parlaklık değişikliği bir geçiş için yeterlidir; yerleşik
 durumda animasyon zamanlayıcısı tamamen durur.
 
-Wayland `ext-idle-notify-v1`, GNOME Mutter IdleMonitor ve X11 XSync IDLETIME
-olayları kullanılır. Ekran görüntüsü, tuş içeriği, evdev/grab, periyodik idle
-sorgusu veya ekranın görsel içeriği izlenmez. Video oynarken de gerçek kullanıcı
-etkinliği esas alınır (Wayland v2 input-idle destekliyorsa).
+Tam modele ait sürücü, yalnız `i8042/serio0` üzerindeki `atkbd` aygıtını pasif
+olarak gözler. USB, Bluetooth ve sanal aygıtlar adlarından bağımsız dışlanır.
+Çekirdek dışına tuş kodu, karakter veya olay akışı çıkmaz; yalnız root'un
+okuyabildiği son etkinlik zamanı vardır. Ekran görüntüsü veya evdev/grab yoktur.
+Etkin yazım sırasında her tuş için kullanıcı alanı uyandırılmaz: ctl yalnız
+bekleme süresinin sonundaki zamanlayıcıda son etkinlik zamanını okur. Beklemede
+zamanlayıcı durur ve sonraki yerleşik tuş basışı tek bir sysfs bildirimi üretir.
+Bildirim kurulurken yeniden okuma, aynı anda gelen tuşun kaybolmasını önler.
+Bu yol Wayland, GNOME ve X11 için aynı ctl backendini kullanır; oturum köprüsü
+artık görüntü sunucusu kitaplıklarına bağlı değildir.
 
 Sistem brokeri gönderen UID'sini D-Bus'tan, etkin kullanıcıyı logind seat0'dan
-doğrular. İstemci keyfi aygıt yolu/USB raporu gönderemez. Oturum bağlantısı
-kapanırsa, etkin kullanıcı değişirse, sistem uykuya girerse veya broker
-sonlanırsa ölçek sıfırlanır. Güç tasarrufundan çıkış ve özelliği kapatma normal
+doğrular. İstemci keyfi aygıt yolu/USB raporu veya masaüstü etkinlik bildirimi
+gönderemez. Etkin kullanıcı kalmazsa, sistem uykuya girerse veya broker
+sonlanırsa ölçek sıfırlanır. Sonlandırma temizliği etkinlik gözlemcisini de
+kapatır. Seçili parlaklık sıfırken etkinlik gözlemi çalışmaz. Güç tasarrufundan
+çıkış ve özelliği kapatma normal
 beş saniyelik geri dönüşü kullanır. Kullanıcı oturum hizmeti donanım dosyalarına
 doğrudan yazmaz; bütün geçişleri sistem brokeri yürütür.
 
@@ -42,3 +53,5 @@ Bekleme takibi durdurulur; sistem brokeri seçili seviyeye dönüşü gerçekten
 tamamlamadan ölçüm yardımcısı başlamaz. Pencere kapatılırsa, araç çökerse veya
 hazırlık başarısız olursa hak otomatik bırakılır ve bekleme takibi yeniden
 başlar. Kalibrasyon arayüzü DE etkinliğini kendi başına sorgulamaz.
+
+Referans: [Linux input handler ve pasif gözlemci API'si](https://docs.kernel.org/driver-api/input.html).

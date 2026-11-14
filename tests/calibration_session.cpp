@@ -22,15 +22,16 @@ class Core final:public QObject,protected QDBusContext {
     Q_CLASSINFO("D-Bus Interface","org.gamegaraj.Slayer1")
 public:
     int preparations=0;
-    bool reject=false;
+    bool reject=false,monitoring=true;
     QList<bool> notifications;
     QList<QDBusMessage> waiting;
     void finish(){for(const auto& request:std::as_const(waiting))QDBusConnection::sessionBus().send(request.createReply(QVariantList{true}));waiting.clear();}
 public Q_SLOTS:
-    QVariantMap ReadSessionSettings(){return {{"enabled",true},{"timeout",5u},{"powerSaver",true},{"available",true},{"lightingOwner",QStringLiteral("kde")},{"sleeping",false}};}
+    QVariantMap ReadSessionSettings(){return {{"enabled",true},{"timeout",5u},{"powerSaver",true},{"available",true},{"lightingOwner",QStringLiteral("kde")},{"sleeping",false},{"armed",monitoring},{"idle",false},{"backend",QStringLiteral("internal-keyboard")}};}
     void Subscribe(){}
     bool IdleChanged(bool value){notifications.append(value);return true;}
-    bool PrepareCalibration(){++preparations;if(reject)return false;setDelayedReply(true);waiting.append(message());return false;}
+    bool PrepareCalibration(){++preparations;monitoring=false;Q_EMIT SessionSettingsChanged();if(reject)return false;setDelayedReply(true);waiting.append(message());return false;}
+    bool FinishCalibration(){monitoring=true;Q_EMIT SessionSettingsChanged();return true;}
 Q_SIGNALS:
     void SessionSettingsChanged();
 };
@@ -61,9 +62,11 @@ int main(int argc,char** argv){
     QProcess child;auto env=QProcessEnvironment::systemEnvironment();env.insert("DBUS_SYSTEM_BUS_ADDRESS",qEnvironmentVariable("DBUS_SESSION_BUS_ADDRESS"));env.remove("WAYLAND_DISPLAY");env.remove("DISPLAY");child.setProcessEnvironment(env);child.start(QString::fromLocal8Bit(argv[1]));require(child.waitForStarted(),"Session process startup");
     require(until([&]{return bus.interface()->isServiceRegistered("org.gamegaraj.Slayer.Session1").value();}),"Session bus name");
     require(until([&]{return status(bus).value("armed").toBool();}),"Idle watch armed");
-    require(status(bus).value("backend").toString()==QStringLiteral("gnome-mutter-idle-monitor"),"GNOME backend selected");
+    require(status(bus).value("backend").toString()==QStringLiteral("internal-keyboard"),"Internal keyboard backend selected");
+    require(mutter.watches.isEmpty(),"Global idle input must not be monitored");
     Q_EMIT mutter.WatchFired(mutter.lastIdle);
-    require(until([&]{return core.notifications.contains(true);}),"Idle notification forwarded");
+    QCoreApplication::processEvents(QEventLoop::AllEvents,10);
+    require(core.notifications.isEmpty(),"Global desktop input affected keyboard lighting");
     {
         auto a=QDBusConnection::connectToBus(QDBusConnection::SessionBus,"calibration-a");
         auto requestA=send(a,"BeginCalibration");

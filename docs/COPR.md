@@ -35,7 +35,7 @@ therefore do not use `installonlypkg(kernel-module)`, which would attempt to
 co-install conflicting payload versions for one ABI.
 
 Secure Boot is not disabled. At install, the upstream Linux sign-file utility
-(compiled on COPR) can sign the downloaded modules with an existing root-only
+(compiled on COPR) can sign the downloaded modules with an existing root-owned
 akmods MOK key. The standard root-owned `kmodgenca` links and dedicated akmods
 group's read access are supported; writable or unprotected key paths are rejected.
 This machine already has that key enrolled. No key is created or

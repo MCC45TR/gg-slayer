@@ -5,8 +5,8 @@
 %global kver %(v=$(rpm -q --qf '%%{VERSION}-%%{RELEASE}.%%{ARCH}\\n' kernel-devel 2>/dev/null); if test $? -eq 0; then echo "$v" | sort -V | tail -n1; else echo 0; fi)
 %global copr_build 0
 Name: ite8291r3-kmod
-Version: 0.0.20261114.1
-Release: 3.%{copr_build}%{?dist}
+Version: 0.0.20261114.2
+Release: 1.%{copr_build}%{?dist}
 Summary: Native ITE keyboard LED driver with quiet idle brightness
 License: GPL-2.0-or-later
 URL: https://github.com/MCC45TR/gg-slayer
@@ -14,7 +14,7 @@ Packager: MCC45TR <mcc45tr@gmail.com>
 Source0: ite_8291.tar.gz
 ExclusiveArch: x86_64
 BuildRequires: gcc, make, kernel-devel, elfutils-libelf-devel
-Requires: slayerctl >= 0.1.2-4
+Requires: slayerctl >= 0.1.3
 Requires: kmod-ite8291r3-%{kver} = %{version}-%{release}
 Provides: ite8291r3-kmod-common = %{version}-%{release}
 Obsoletes: ite8291r3-kmod-common < %{version}-%{release}
@@ -28,7 +28,7 @@ runs on installation. The kernel-specific payload remains available for its ABI.
 %package -n kmod-ite8291r3-%{kver}
 Summary: Native ITE keyboard LED driver with quiet idle brightness for %{kver}
 Requires: kernel-uname-r = %{kver}
-Requires: slayerctl >= 0.1.2-4
+Requires: slayerctl >= 0.1.3
 Provides: kernel-modules-for-kernel = %{kver}
 # The name already includes the kernel ABI: retain different-ABI packages,
 # but upgrade this ABI's payload normally. installonly would co-install two
@@ -56,6 +56,8 @@ printf 'ite_8291\n' > %{buildroot}%{_sysconfdir}/modules-load.d/ite8291r3.conf
 %files -n kmod-ite8291r3-%{kver}
 %{_prefix}/lib/modules/%{kver}/extra/ite8291r3/
 %changelog
+* Sat Nov 14 2026 MCC45TR <mcc45tr@gmail.com> - 0.0.20261114.2-1
+- Interpolate idle fades to the measured visible 2/50 hardware minimum.
 * Sat Nov 14 2026 MCC45TR <mcc45tr@gmail.com> - 0.0.20261114.1-3
 - Repeat activation with standard Fedora kmodgenca link and permission support.
 * Sat Nov 14 2026 MCC45TR <mcc45tr@gmail.com> - 0.0.20261114.1-2

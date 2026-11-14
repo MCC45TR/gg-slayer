@@ -22,10 +22,11 @@
 #include "thermal_profile.h"
 #include "model_contract.h"
 #include "mux_transaction.h"
-#define R9T_DRIVER_VERSION "0.1.1"
+#define R9T_DRIVER_VERSION "0.1.2"
 
 static acpi_handle ec;
 static struct platform_device *pdev;
+#include "internal_keyboard.h"
 static struct device *hwmon;
 static bool usb_charging_supported;
 static bool event_driver_registered;
@@ -356,7 +357,9 @@ static DEVICE_ATTR_RO(charging_profiles_available);
 static ssize_t backend_version_show(struct device *dev, struct device_attribute *attr, char *buf)
 { return sysfs_emit(buf, R9T_DRIVER_VERSION " R9T-IDK26-N.1.46GAR16\n"); }
 static DEVICE_ATTR_RO(backend_version);
-static struct attribute *attrs[] = { &dev_attr_profile_event_count.attr, &dev_attr_thermal_mode.attr, &dev_attr_thermal_mode_choices.attr, &dev_attr_profile_events.attr, &dev_attr_thermal_control.attr, &dev_attr_backend_version.attr, &dev_attr_charging_profile.attr,
+static struct attribute *attrs[] = { &dev_attr_keyboard_activity.attr, &dev_attr_keyboard_activity_present.attr,
+ &dev_attr_keyboard_activity_monitor.attr, &dev_attr_keyboard_activity_arm.attr,
+ &dev_attr_profile_event_count.attr, &dev_attr_thermal_mode.attr, &dev_attr_thermal_mode_choices.attr, &dev_attr_profile_events.attr, &dev_attr_thermal_control.attr, &dev_attr_backend_version.attr, &dev_attr_charging_profile.attr,
 	&dev_attr_charging_profiles_available.attr, &dev_attr_fn_lock.attr,
  &dev_attr_fan_mode.attr, &dev_attr_fan_modes_available.attr,
  &dev_attr_usb_sleep_charging_supported.attr, NULL };
@@ -521,6 +524,9 @@ static int __init r9t_init(void)
  else pr_warn("slayerctl_r9t: WMI event observer unavailable: %d\n", ret);
  attach_query_observer();
  battery_hook_register(&hook);
+ ret = input_register_handler(&keyboard_handler);
+ if (!ret) keyboard_handler_registered = true;
+ else pr_warn("slayerctl_r9t: internal keyboard observer unavailable: %d\n", ret);
 	pr_info("slayerctl_r9t: exact model/BIOS/project matched; factory thermal/fan/Fn and charge profiles; MUX=%d\n", mux_available);
 	return 0;
 fail_mux:
@@ -535,6 +541,7 @@ fail:
 }
 static void __exit r9t_exit(void)
 {
+ keyboard_activity_exit();
  if (event_driver_registered) wmi_driver_unregister(&event_driver);
  if (profile_ec) acpi_ec_remove_query_handler(profile_ec, 0x88);
  cancel_delayed_work_sync(&thermal_event);
