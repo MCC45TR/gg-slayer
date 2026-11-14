@@ -41,7 +41,10 @@ void InternalKeyboard::stop(){
     fd=-1;running=false;setIdle(false);
 }
 void InternalKeyboard::configure(bool enabled,unsigned timeout){
-    if(enabled&&running&&seconds==timeout)return;
+    if(enabled&&running){
+        if(seconds!=timeout){seconds=timeout;evaluate();Q_EMIT statusChanged();}
+        return;
+    }
     stop();seconds=timeout;lastError.clear();
     if(!enabled){Q_EMIT statusChanged();return;}
     if(!available()){lastError=tr("Yerleşik klavye etkinlik sürücüsü kullanılamıyor.");Q_EMIT statusChanged();return;}

@@ -73,7 +73,11 @@ class Service final:public QObject,protected QDBusContext {
         if(!lit)dimmer.reset();
         touch();
     }
-    void releaseIdle(){idleOwner.clear();dimmer.reset();refreshActivity();}
+    void releaseIdle(){
+        idleOwner.clear();
+        if(asleep)dimmer.reset();else dimmer.fade(false);
+        refreshActivity();
+    }
     void activateSession(){QProcess::startDetached("/usr/libexec/slayerctl-desktop",{"--reload-session"});}
     QString syncOrigin,syncError,expectedDesktop,expectedHardware;
     void reloadSync(){

@@ -1,6 +1,6 @@
 Name:           slayerctl
-Version:        0.1.3
-Release:        8%{?dist}
+Version:        0.1.4
+Release:        1%{?dist}
 Summary:        Game Garaj Slayer hardware control backend
 License:        MIT AND LGPL-2.1-or-later
 URL:            https://github.com/MCC45TR/gg-slayer

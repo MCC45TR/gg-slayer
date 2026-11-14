@@ -25,9 +25,9 @@ IdleDimmer::IdleDimmer(QObject* parent):QObject(parent) {
     timer.setTimerType(Qt::PreciseTimer);
     connect(&timer,&QTimer::timeout,this,[this]{
         const auto ms=elapsed.elapsed();
-        const int next=slayer::idleScaleAt(from,target,ms);
+        const int next=transition.sample(ms).rounded();
         if(!writeScale(next)){reset();return;}
-        if(ms>=slayer::idleFadeMilliseconds){timer.stop();if(target==1000){if(fd>=0){close(fd);fd=-1;}complete(true);}}
+        if(ms>=slayer::idleFadeMilliseconds){timer.stop();if(transition.target()==1000){if(fd>=0){close(fd);fd=-1;}complete(true);}}
     });
     reset();
 }
@@ -47,9 +47,11 @@ bool IdleDimmer::writeScale(int value){
 bool IdleDimmer::fade(bool dim){
     if(dim)complete(false);
     const int next=dim?1:1000;
-    if(next==target&&(timer.isActive()||current==next))return true;
-    if(!writeScale(current))return false;
-    from=current;target=next;elapsed.start();timer.start();return true;
+    if(next==transition.target()&&(timer.isActive()||current==next))return true;
+    const auto state=transition.sample(timer.isActive()?elapsed.elapsed():slayer::idleFadeMilliseconds);
+    if(!writeScale(state.rounded()))return false;
+    transition=slayer::IdleTransition(state,next);
+    elapsed.start();timer.start();return true;
 }
 void IdleDimmer::complete(bool ok){auto callbacks=std::move(restored);restored.clear();for(auto& ready:callbacks)ready(ok);}
 void IdleDimmer::restore(std::function<void(bool)> ready){
@@ -63,6 +65,6 @@ void IdleDimmer::restore(std::function<void(bool)> ready){
 void IdleDimmer::reset(){
     timer.stop();writeScale(1000);
     if(fd>=0)close(fd);
-    fd=-1;current=from=target=1000;
+    fd=-1;current=1000;transition=slayer::IdleTransition();
     complete(false);
 }

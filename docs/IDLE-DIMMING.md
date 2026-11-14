@@ -15,7 +15,7 @@ slayerctl idle off
 Süreler: 5, 10, 15, 30, 60, 120, 180, 300, 600, 900, 1200, 1800 saniye.
 Varsayılan süre 30 saniye. Özellik açıkken yalnız masaüstünün `power-saver`
 profilinde etkinlik izlenir. Seçili parlaklık sıfırsa ışık kapalı kalır;
-pozitifse beş saniyelik smoothstep geçişiyle donanımda görünür olan **2/50 (%4)**
+pozitifse beş saniyelik yumuşak geçişle donanımda görünür olan **2/50 (%4)**
 seviyesine iner. Bu cihazda 1/50 (%2) optik olarak kapalıdır; pozitif değerler
 bu yüzden en az 2/50 uygulanır. Yalnız laptopun yerleşik klavyesindeki basış,
 ışığı beş saniyede seçili seviyeye geri döndürür. Harici USB/Bluetooth klavye,
@@ -64,3 +64,16 @@ Hak bağlantı kopunca otomatik bırakılır; PowerDevil yeniden başlayınca ct
 tekrar alır. Özellik kapatıldığında veya güç tasarrufundan çıkıldığında bırakılır.
 Gerekli PowerDevil uzantısı aynı COPR'dan sağlanır. Kurulu KDE bu arayüzü
 sunmuyorsa ctl oturum durumu eksik entegrasyonu açıkça bildirir.
+
+0.1.4'te aktif/bekleme geçişi tek bir hareket modeli kullanır. Aktif hedef
+KDE'nin seçtiği mantıksal parlaklık; bekleme hedefi görünür %4 tabandır.
+Yarıda gelen yerleşik tuş basışı, son USB kademesinden bağımsız olarak o anki
+kesintisiz konumu ve hızı örnekler. Mevcut hareket en fazla 120 ms içinde
+kademeli frenlenir; kalan sürede yeni hedefe yumuşakça ulaşır. Toplam geçiş,
+yön değişiminden itibaren beş saniyedir. Konum ve hız süreklidir; iki uçta
+hız sıfırlanır. Arka arkaya aynı hedefi bildirmek geçişi yeniden başlatmaz.
+
+Bekleme süresi değiştirildiğinde son fiziksel etkinlik zamanı korunur.
+Kalibrasyon hakkının bırakılması/iptali aktif seviyeye ani sıçrama yapmaz;
+normal geri dönüş eğrisini sürdürür. Açıkça sıfır seçmek, uyku ve hizmetin
+sonlandırılması donanım temizleme yollarıdır; sıfır seçiminde ışık kapalıdır.
