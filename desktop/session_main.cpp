@@ -47,12 +47,24 @@ class Session final:public QObject,protected QDBusContext {
         }
         if(keyboardPolicyCookie||keyboardPolicyPending)return;
         keyboardPolicyPending=true;const auto generation=++keyboardPolicyGeneration;
-        auto get=QDBusMessage::createMethodCall("org.kde.Solid.PowerManagement","/org/kde/Solid/PowerManagement/PolicyAgent","org.freedesktop.DBus.Properties","Get");
+        auto lookup=QDBusMessage::createMethodCall("org.freedesktop.DBus","/org/freedesktop/DBus","org.freedesktop.DBus","GetNameOwner");
+        lookup<<QStringLiteral("org.kde.Solid.PowerManagement");
+        auto* resolved=new QDBusPendingCallWatcher(QDBusConnection::sessionBus().asyncCall(lookup,2000),this);
+        connect(resolved,&QDBusPendingCallWatcher::finished,this,[this,resolved,generation]{
+            QDBusPendingReply<QString> result=*resolved;resolved->deleteLater();
+            if(generation!=keyboardPolicyGeneration)return;
+            if(result.isError()){keyboardPolicyPending=false;keyboardPolicyError=tr("KDE güç hizmeti kullanılamıyor.");return;}
+            acquireKeyboardPolicy(result.value(),generation);
+        });
+    }
+    void acquireKeyboardPolicy(const QString& destination,quint64 generation){
+        // Address the unique owner for the complete transaction: a restart must
+        // never release an old cookie on a different PowerDevil instance.
+        auto get=QDBusMessage::createMethodCall(destination,"/org/kde/Solid/PowerManagement/PolicyAgent","org.freedesktop.DBus.Properties","Get");
         get<<QStringLiteral("org.kde.Solid.PowerManagement.PolicyAgent")<<QStringLiteral("SupportedInhibitionTypes");
         auto* pending=new QDBusPendingCallWatcher(QDBusConnection::sessionBus().asyncCall(get,2000),this);
-        connect(pending,&QDBusPendingCallWatcher::finished,this,[this,pending,generation]{
-            QDBusPendingReply<QDBusVariant> result=*pending;
-            const auto destination=pending->reply().service();pending->deleteLater();
+        connect(pending,&QDBusPendingCallWatcher::finished,this,[this,pending,generation,destination]{
+            QDBusPendingReply<QDBusVariant> result=*pending;pending->deleteLater();
             if(generation!=keyboardPolicyGeneration)return;
             if(result.isError()||!(result.value().variant().toUInt()&8u)){
                 keyboardPolicyPending=false;
