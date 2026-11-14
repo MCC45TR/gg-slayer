@@ -1,6 +1,6 @@
 Name:           slayerctl
 Version:        0.1.2
-Release:        2%{?dist}
+Release:        3%{?dist}
 Summary:        Game Garaj Slayer hardware control backend
 License:        MIT AND LGPL-2.1-or-later
 URL:            https://github.com/MCC45TR/gg-slayer
@@ -150,6 +150,8 @@ desktop-file-validate %{buildroot}%{_datadir}/applications/slayer-control-gtk.de
 %{_datadir}/applications/slayer-control-gtk.desktop
 
 %changelog
+* Sat Nov 14 2026 MCC45TR <mcc45tr@gmail.com> - 0.1.2-3
+- Sign remote modules using the protected links and permissions from kmodgenca.
 * Sat Nov 14 2026 MCC45TR <mcc45tr@gmail.com> - 0.1.2-1
 - Keep calibration brightness constant with ctl-owned, disconnect-safe leases.
 - Wait for the actual brightness restore before starting a measurement worker.

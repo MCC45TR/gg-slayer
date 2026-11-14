@@ -36,7 +36,9 @@ co-install conflicting payload versions for one ABI.
 
 Secure Boot is not disabled. At install, the upstream Linux sign-file utility
 (compiled on COPR) can sign the downloaded modules with an existing root-only
-akmods MOK key. This machine already has that key enrolled. No key is created or
+akmods MOK key. The standard root-owned `kmodgenca` links and dedicated akmods
+group's read access are supported; writable or unprotected key paths are rejected.
+This machine already has that key enrolled. No key is created or
 enrolled automatically. On another machine without an enrolled key, Secure Boot
 module loading requires the administrator's normal signing/enrollment setup.
 

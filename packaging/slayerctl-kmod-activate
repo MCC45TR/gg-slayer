@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: MIT
 # Called by a kernel-specific COPR RPM after its payload is installed.
 set -euo pipefail
+trap 'echo "slayerctl: module activation failed at line $LINENO (${driver_name:-unknown}); the previous loaded module is unchanged" >&2' ERR
 test "$EUID" -eq 0
 test "$#" -eq 2
 kernel_version=$1
@@ -20,12 +21,39 @@ if test -z "$(/usr/sbin/modinfo -F signer "$module_file")"; then
  key=/etc/pki/akmods/private/private_key.priv
  cert=/etc/pki/akmods/certs/public_key.der
  if test -f "$key" && test -f "$cert"; then
-  test ! -L "$key"
+  # kmodgenca uses root-owned links to timestamped files, and grants its
+  # dedicated akmods service group read access. Resolve those links only
+  # inside the protected directories, never an arbitrary link destination.
+  for directory in /etc /etc/pki /etc/pki/akmods /etc/pki/akmods/private /etc/pki/akmods/certs; do
+   test -d "$directory" && test ! -L "$directory"
+   test "$(stat -c %u "$directory")" = 0
+   directory_mode=$(stat -c %a "$directory")
+   (( (8#$directory_mode & 022) == 0 ))
+  done
   test "$(stat -c %u "$key")" = 0
-  # Never accept a group/world-readable signing key.
+  test "$(stat -c %u "$cert")" = 0
+  key=$(readlink -e "$key")
+  cert=$(readlink -e "$cert")
+  test "$(dirname "$key")" = /etc/pki/akmods/private
+  test "$(dirname "$cert")" = /etc/pki/akmods/certs
+  test -f "$key" && test -f "$cert"
+  test "$(stat -c %u "$key")" = 0
+  test "$(stat -c %u "$cert")" = 0
   key_mode=$(stat -c %a "$key")
-  (( (8#$key_mode & 077) == 0 ))
+  # No group write/execute or access for other users. A readable group must
+  # be root or Fedora's existing akmods group; do not change key permissions.
+  (( (8#$key_mode & ~0640) == 0 ))
+  if (( (8#$key_mode & 040) != 0 )); then
+   key_group=$(stat -c %g "$key")
+   if test "$key_group" != 0; then
+    akmods_group=$(getent group akmods | cut -d: -f3)
+    test -n "$akmods_group" && test "$key_group" = "$akmods_group"
+   fi
+  fi
+  cert_mode=$(stat -c %a "$cert")
+  (( (8#$cert_mode & 022) == 0 ))
   /usr/libexec/slayerctl-module-sign sha256 "$key" "$cert" "$module_file"
+  test -n "$(/usr/sbin/modinfo -F signer "$module_file")"
  fi
 fi
 /usr/sbin/depmod -a "$kernel_version"

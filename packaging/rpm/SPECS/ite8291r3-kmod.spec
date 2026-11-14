@@ -6,7 +6,7 @@
 %global copr_build 0
 Name: ite8291r3-kmod
 Version: 0.0.20261114.1
-Release: 2.%{copr_build}%{?dist}
+Release: 3.%{copr_build}%{?dist}
 Summary: Native ITE keyboard LED driver with quiet idle brightness
 License: GPL-2.0-or-later
 URL: https://github.com/MCC45TR/gg-slayer
@@ -56,6 +56,8 @@ printf 'ite_8291\n' > %{buildroot}%{_sysconfdir}/modules-load.d/ite8291r3.conf
 %files -n kmod-ite8291r3-%{kver}
 %{_prefix}/lib/modules/%{kver}/extra/ite8291r3/
 %changelog
+* Sat Nov 14 2026 MCC45TR <mcc45tr@gmail.com> - 0.0.20261114.1-3
+- Repeat activation with standard Fedora kmodgenca link and permission support.
 * Sat Nov 14 2026 MCC45TR <mcc45tr@gmail.com> - 0.0.20261114.1-2
 - Allow normal DNF upgrades of the payload for the same kernel ABI.
 * Sat Nov 14 2026 MCC45TR <mcc45tr@gmail.com> - 0.0.20261114.1-1

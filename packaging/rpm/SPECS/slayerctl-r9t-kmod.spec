@@ -6,7 +6,7 @@
 %global copr_build 0
 Name: slayerctl-r9t-kmod
 Version: 0.1.1
-Release: 2.%{copr_build}%{?dist}
+Release: 3.%{copr_build}%{?dist}
 Summary: Exact-model Slayer R9T controls and hwmon bridge
 License: GPL-2.0-only
 URL: https://github.com/MCC45TR/gg-slayer
@@ -56,6 +56,8 @@ printf 'slayerctl_r9t\n' > %{buildroot}%{_sysconfdir}/modules-load.d/slayerctl-r
 %files -n kmod-slayerctl-r9t-%{kver}
 %{_prefix}/lib/modules/%{kver}/extra/slayerctl-r9t/
 %changelog
+* Sat Nov 14 2026 MCC45TR <mcc45tr@gmail.com> - 0.1.1-3
+- Repeat activation with standard Fedora kmodgenca link and permission support.
 * Sat Nov 14 2026 MCC45TR <mcc45tr@gmail.com> - 0.1.1-2
 - Allow normal DNF upgrades of the payload for the same kernel ABI.
 * Sat Nov 14 2026 MCC45TR <mcc45tr@gmail.com> - 0.1.1-1
