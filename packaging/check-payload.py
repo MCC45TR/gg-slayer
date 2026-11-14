@@ -26,16 +26,15 @@ required = (
     '/usr/lib64/qt6/plugins/plasma/kcms/systemsettings/kcm_slayerctl.so',
     '/usr/share/applications/slayer-control.desktop',
     '/usr/share/applications/kcm_slayerctl.desktop',
-    '/usr/share/plasma/plasmoids/org.gamegaraj.slayerctl.camera/metadata.json',
-    '/usr/share/plasma/plasmoids/org.gamegaraj.slayerctl.camera/contents/ui/main.qml',
-    '/usr/lib64/qt6/qml/org/gamegaraj/slayerctl/camera/qmldir',
-    '/usr/lib64/qt6/qml/org/gamegaraj/slayerctl/camera/libslayer-cameraplugin.so',
     '/usr/lib/udev/rules.d/85-slayerctl-power.rules',
     '/usr/lib/systemd/system-preset/90-slayerctl.preset',
     '/etc/slayerctl/slayerctl.conf',
 )
 for name in required:
     assert (root / name.lstrip('/')).is_file(), name
+for removed in ('usr/share/plasma/plasmoids/org.gamegaraj.slayerctl.camera',
+                'usr/lib64/qt6/qml/org/gamegaraj/slayerctl/camera'):
+    assert not (root / removed).exists(), 'Removed camera applet remains in package: ' + removed
 for file in root.rglob('*'):
     if not file.is_file():
         continue

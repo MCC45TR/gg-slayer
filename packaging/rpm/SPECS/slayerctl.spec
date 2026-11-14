@@ -1,5 +1,5 @@
 Name:           slayerctl
-Version:        0.1.5
+Version:        0.1.6
 Release:        1%{?dist}
 Summary:        Game Garaj Slayer hardware control backend
 License:        MIT AND LGPL-2.1-or-later
@@ -16,7 +16,6 @@ BuildRequires:  systemd-rpm-macros, desktop-file-utils, breeze-icon-theme
 BuildRequires:  kf6-kirigami, kf6-qqc2-desktop-style, qt6-qtimageformats
 BuildRequires:  desktop-backgrounds-kde, xkeyboard-config
 BuildRequires:  dbus-daemon
-BuildRequires:  libplasma
 Requires:       polkit, systemd, systemd-udev, /usr/bin/systemd-creds
 Recommends:     slayerctl-r9t-kmod, ite8291r3-kmod
 Recommends:     (powerdevil-keyboard-idle-inhibition if powerdevil)
@@ -42,8 +41,6 @@ Obsoletes:      slayerctl-kde < 0.1.0
 Kirigami control interface and KDE System Settings module. Hardware logic
 and desktop integration belong to slayerctl. The Qt application can open
 separately installed Kenning settings without loading a face recognition engine.
-Includes a native Plasma tray applet for built-in camera privacy, without
-an additional background process or periodic hardware polling.
 Developer: MCC45TR.
 
 %package -n slayer-face-auth
@@ -144,8 +141,6 @@ desktop-file-validate %{buildroot}%{_datadir}/applications/slayer-control-gtk.de
 %{_datadir}/applications/slayer-control.desktop
 %{_libdir}/qt6/plugins/plasma/kcms/systemsettings/kcm_slayerctl.so
 %{_datadir}/applications/kcm_slayerctl.desktop
-%{_datadir}/plasma/plasmoids/org.gamegaraj.slayerctl.camera/
-%{_libdir}/qt6/qml/org/gamegaraj/
 %dir %{_datadir}/slayerctl
 %dir %{_datadir}/slayerctl/tools
 %{_datadir}/slayerctl/tools/*.py
@@ -160,6 +155,8 @@ desktop-file-validate %{buildroot}%{_datadir}/applications/slayer-control-gtk.de
 %{_datadir}/applications/slayer-control-gtk.desktop
 
 %changelog
+* Sat Nov 14 2026 MCC45TR <mcc45tr@gmail.com> - 0.1.6-1
+- Remove the redundant Slayer camera applet and its backend; retain KDE's own indicator.
 * Sat Nov 14 2026 MCC45TR <mcc45tr@gmail.com> - 0.1.5-1
 - Add native Plasma camera privacy, configurable Copilot actions and visible charge limits.
 - Reduce idle work and harden command queuing, privilege boundaries and device rollback.

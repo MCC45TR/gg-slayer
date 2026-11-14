@@ -15,7 +15,7 @@ sudo dnf upgrade --refresh 'slayer*' 'ite8291r3*' 'kmod-slayerctl*' 'kmod-ite829
 | Paket | İşlev |
 | --- | --- |
 | `slayerctl` | CLI, sistem D-Bus brokeri, DE bağlantıları, oturum ve donanım yürütmesi |
-| `slayer-control-qt` | Kirigami Qt arayüzü, KDE Sistem Ayarları modülü ve yerel kamera tepsi bileşeni |
+| `slayer-control-qt` | Kirigami Qt arayüzü ve KDE Sistem Ayarları modülü |
 | `slayer-face-auth` | Doğrulanmış IR kamerayla açık Howdy kayıt/test aracı |
 | `slayer-control-gtk` | GNOME için yer tutucu pencere; işlevsel kontrol paneli henüz yok |
 | `slayerctl-r9t-kmod` | COPR'da derlenen, tam modelle sınırlandırılmış R9T sürücüsü |
@@ -52,11 +52,9 @@ okunur. **Canlı sensörler** isteğe bağlıdır; etkin penceredeki Genel Bakı
 10 saniyede bir çalışır. Fan animasyonları varsayılan olarak kapalıdır.
 Pencere odağı kaybolduğunda, küçültüldüğünde veya sayfa değiştiğinde canlı takip durur.
 
-KDE Plasma sistem tepsisindeki **Slayer Kamera Gizliliği**, dahili RGB/IR kamerayı
-açıp kapatır. Kamera kapatıldığında simge erişilebilir kalır; ana arayüzün açık
-olması gerekmez. Paket kurulduktan sonra gerekirse Sistem Tepsisi Ayarları →
-Girdiler bölümünden görünürlüğü seçin. Plasma'nın kendi Kamera Göstergesi kullanım
-durumunu gösterir; Slayer bileşeni kamera erişimini denetler.
+Kamera için KDE Plasma'nın kendi **Kamera Göstergesi** kullanılır. Slayer ayrı
+bir kamera widget'ı veya tepsi simgesi kurmaz. Uygulamadaki dahili RGB/IR kamera
+erişimi ayarı **Aygıtlar → Dahili kamera** bölümündedir.
 
 **Güç ve Pil → Şarj sınırı → Azami dolum miktarı (%)** her zaman görünür.
 Desteklenen cihazda değişikliği **Uygula ve kaydet** ile gönderin. R9T'nin mevcut

@@ -7,7 +7,6 @@ PageBody {
         Layout.fillWidth: true; title: qsTr("Cihaz kontrolleri"); iconName: "preferences-devices"
         Setting { title: qsTr("Fn kilidi"); description: qsTr("İşlev tuşlarının davranışını değiştirir."); capability: "fn"; options: ["on", "off"]; labels: [qsTr("Açık"), qsTr("Kapalı")]; current: device.info.fn_lock === "1" ? "on" : device.info.fn_lock === "0" ? "off" : ""; onChosen: value => control.apply(["settings", "fn-lock", value], ["fn_lock", value]) }
         Setting { title: qsTr("Dahili kamera"); description: qsTr("RGB ve IR kameranın erişimini değiştirir; kapatma görüntülü görüşmeyi kesebilir."); capability: "camera"; options: ["on", "off"]; labels: [qsTr("Açık"), qsTr("Kapalı")]; current: device.info.camera === "1" ? "on" : device.info.camera === "0" ? "off" : ""; onChosen: value => control.apply(["settings", "camera", value], ["camera", value]) }
-        QQC2.Label { text: qsTr("KDE Plasma'da sistem tepsisindeki Slayer Kamera Gizliliği simgesiyle de açıp kapatabilirsiniz."); visible: device.ready("camera"); Layout.fillWidth: true; wrapMode: Text.WordWrap }
         QQC2.Button { text: qsTr("Sistem touchpad ayarları"); onClicked: device.openSettings("touchpad") }
     }
     FaceAuth { Layout.fillWidth: true }
