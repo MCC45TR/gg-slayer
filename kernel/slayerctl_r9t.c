@@ -22,7 +22,7 @@
 #include "thermal_profile.h"
 #include "model_contract.h"
 #include "mux_transaction.h"
-#define R9T_DRIVER_VERSION "0.1.3"
+#define R9T_DRIVER_VERSION "0.1.4"
 
 static acpi_handle ec;
 static struct platform_device *pdev;
@@ -346,6 +346,46 @@ static ssize_t charge_threshold_diagnostics_show(struct device *dev, struct devi
                    values[0], values[1], values[2], values[3], values[4], values[5]);
 }
 static DEVICE_ATTR(charge_threshold_diagnostics, 0400, charge_threshold_diagnostics_show, NULL);
+/* This BIOS's AMW0.WMBC instance 0 / method 4 / SAC1=0x0100 is
+ * the vendor's read mailbox (DSDT RKBC). Fixed addresses only; no write
+ * mailbox opcode or arbitrary address is accepted from userspace. */
+static int charge_mailbox_read(u16 address, u32 *value)
+{
+ u8 bytes[40] = { 0 };
+ union acpi_object params[3] = {
+  { .type = ACPI_TYPE_INTEGER, .integer.value = 0 },
+  { .type = ACPI_TYPE_INTEGER, .integer.value = 4 },
+  { .type = ACPI_TYPE_BUFFER },
+ };
+ struct acpi_object_list args = { .count = 3, .pointer = params };
+ struct acpi_buffer result = { ACPI_ALLOCATE_BUFFER, NULL };
+ union acpi_object *object;
+ int ret = -EOPNOTSUPP;
+ bytes[0] = address & 0xff; bytes[1] = address >> 8;
+ bytes[5] = 1;
+ params[2].buffer.length = sizeof(bytes); params[2].buffer.pointer = bytes;
+ if (ACPI_FAILURE(acpi_evaluate_object(NULL, "\\_SB.AMW0.WMBC", &args, &result))) return -EIO;
+ object = result.pointer;
+ if (object && object->type == ACPI_TYPE_BUFFER && object->buffer.length >= 4) {
+  const u8 *b = object->buffer.pointer;
+  *value = (u32)b[0] | (u32)b[1] << 8 | (u32)b[2] << 16 | (u32)b[3] << 24;
+  if (*value != 0xfefefefe && *value != 0xffffffff) ret = 0;
+ }
+ ACPI_FREE(result.pointer);
+ return ret;
+}
+static ssize_t charge_mailbox_diagnostics_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+ u32 project = 0, stored = 0;
+ int ret;
+ mutex_lock(&lock);
+ ret = charge_mailbox_read(0x0740, &project);
+ if (!ret && (project & 0xff) == 26) ret = charge_mailbox_read(0x087f, &stored);
+ else ret = -EOPNOTSUPP;
+ mutex_unlock(&lock);
+ return sysfs_emit(buf, "available=%u project=0x%08x stored=0x%08x\n", !ret, project, stored);
+}
+static DEVICE_ATTR(charge_mailbox_diagnostics, 0400, charge_mailbox_diagnostics_show, NULL);
 static ssize_t charging_profile_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	unsigned int value;
@@ -376,7 +416,7 @@ static DEVICE_ATTR_RO(charging_profiles_available);
 static ssize_t backend_version_show(struct device *dev, struct device_attribute *attr, char *buf)
 { return sysfs_emit(buf, R9T_DRIVER_VERSION " R9T-IDK26-N.1.46GAR16\n"); }
 static DEVICE_ATTR_RO(backend_version);
-static struct attribute *attrs[] = { &dev_attr_charge_threshold_diagnostics.attr,
+static struct attribute *attrs[] = { &dev_attr_charge_threshold_diagnostics.attr, &dev_attr_charge_mailbox_diagnostics.attr,
  &dev_attr_keyboard_activity.attr, &dev_attr_keyboard_activity_present.attr,
  &dev_attr_keyboard_activity_monitor.attr, &dev_attr_keyboard_activity_arm.attr,
  &dev_attr_profile_event_count.attr, &dev_attr_thermal_mode.attr, &dev_attr_thermal_mode_choices.attr, &dev_attr_profile_events.attr, &dev_attr_thermal_control.attr, &dev_attr_backend_version.attr, &dev_attr_charging_profile.attr,

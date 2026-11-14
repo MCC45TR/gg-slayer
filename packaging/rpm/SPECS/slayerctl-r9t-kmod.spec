@@ -5,7 +5,7 @@
 %global kver %(v=$(rpm -q --qf '%%{VERSION}-%%{RELEASE}.%%{ARCH}\\n' kernel-devel 2>/dev/null); if test $? -eq 0; then echo "$v" | sort -V | tail -n1; else echo 0; fi)
 %global copr_build 0
 Name: slayerctl-r9t-kmod
-Version: 0.1.3
+Version: 0.1.4
 Release: 1.%{copr_build}%{?dist}
 Summary: Exact-model Slayer R9T controls and hwmon bridge
 License: GPL-2.0-only
@@ -56,6 +56,8 @@ printf 'slayerctl_r9t\n' > %{buildroot}%{_sysconfdir}/modules-load.d/slayerctl-r
 %files -n kmod-slayerctl-r9t-%{kver}
 %{_prefix}/lib/modules/%{kver}/extra/slayerctl-r9t/
 %changelog
+* Sat Nov 14 2026 MCC45TR <mcc45tr@gmail.com> - 0.1.4-1
+- Diagnose the BIOS read mailbox for the fixed project and stored limit fields.
 * Sat Nov 14 2026 MCC45TR <mcc45tr@gmail.com> - 0.1.3-1
 - Add root-only fixed-address charging diagnostics without new firmware writes.
 * Sat Nov 14 2026 MCC45TR <mcc45tr@gmail.com> - 0.1.2-1
