@@ -47,7 +47,13 @@ int main(int argc,char** argv){
         QDBusInterface core("org.gamegaraj.Slayer1","/org/gamegaraj/Slayer1","org.gamegaraj.Slayer1",QDBusConnection::systemBus());core.setTimeout(90000);
         if(args.size()==1||args==QStringList{"--idle","status"}){
             QDBusReply<QVariantMap> result=core.call("ReadSessionSettings");if(!result.isValid())return 4;
-            const auto values=result.value();QTextStream out(stdout);for(auto it=values.cbegin();it!=values.cend();++it)out<<it.key()<<": "<<it.value().toString()<<'\n';return 0;
+            auto values=result.value();
+            if(geteuid()!=0){
+                QDBusInterface session("org.gamegaraj.Slayer.Session1","/org/gamegaraj/Slayer/Session1","org.gamegaraj.Slayer.Session1",QDBusConnection::sessionBus());session.setTimeout(2000);
+                QDBusReply<QVariantMap> desktop=session.call("Status");
+                if(desktop.isValid()){const auto state=desktop.value();for(auto it=state.cbegin();it!=state.cend();++it)values.insert("session_"+it.key(),it.value());}
+            }
+            QTextStream out(stdout);for(auto it=values.cbegin();it!=values.cend();++it)out<<it.key()<<": "<<it.value().toString()<<'\n';return 0;
         }
         QStringList command{"config","set"};
         if(args.size()==2&&QStringList{"on","off"}.contains(args[1]))command.append({"keyboard_idle_dim",args[1]});

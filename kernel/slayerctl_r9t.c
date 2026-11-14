@@ -340,12 +340,12 @@ static int profile_write(unsigned int value)
 static void charge_restore_work(struct work_struct *work)
 {
     struct power_supply *battery;
-    unsigned int wanted, current;
+    unsigned int wanted, observed_profile;
     int ret;
     mutex_lock(&lock);
     wanted = selected_charge_profile;
-    ret = profile_read(&current);
-    if (!ret && current == wanted) {
+    ret = profile_read(&observed_profile);
+    if (!ret && observed_profile == wanted) {
         mutex_unlock(&lock);
         return;
     }
