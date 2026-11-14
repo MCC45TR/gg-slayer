@@ -6,7 +6,7 @@
 %global copr_build 0
 Name: ite8291r3-kmod
 Version: 0.0.20261114.1
-Release: 1.%{copr_build}%{?dist}
+Release: 2.%{copr_build}%{?dist}
 Summary: Native ITE keyboard LED driver with quiet idle brightness
 License: GPL-2.0-or-later
 URL: https://github.com/MCC45TR/gg-slayer
@@ -30,7 +30,9 @@ Summary: Native ITE keyboard LED driver with quiet idle brightness for %{kver}
 Requires: kernel-uname-r = %{kver}
 Requires: slayerctl
 Provides: kernel-modules-for-kernel = %{kver}
-Provides: installonlypkg(kernel-module)
+# The name already includes the kernel ABI: retain different-ABI packages,
+# but upgrade this ABI's payload normally. installonly would co-install two
+# versions owning the same .ko and prevent migration from the local packages.
 %description -n kmod-ite8291r3-%{kver}
 Binary module built on COPR against the exact %{kver} headers.
 
@@ -54,5 +56,7 @@ printf 'ite_8291\n' > %{buildroot}%{_sysconfdir}/modules-load.d/ite8291r3.conf
 %files -n kmod-ite8291r3-%{kver}
 %{_prefix}/lib/modules/%{kver}/extra/ite8291r3/
 %changelog
+* Sat Nov 14 2026 MCC45TR <mcc45tr@gmail.com> - 0.0.20261114.1-2
+- Allow normal DNF upgrades of the payload for the same kernel ABI.
 * Sat Nov 14 2026 MCC45TR <mcc45tr@gmail.com> - 0.0.20261114.1-1
 - Build binary modules on COPR and sign with an existing enrolled MOK at install.

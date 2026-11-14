@@ -29,6 +29,10 @@ Their RPM names and dependencies include the exact kernel ABI. DNF never runs
 akmods. A new kernel ABI needs a new COPR module build; use `build-package` above
 (or the GitHub manual build workflow), then DNF upgrade. Previously installed
 kernel-specific packages remain available for their matching kernels.
+Rebuilding a module for the same ABI upgrades its existing payload. The
+kernel-specific name already keeps other ABIs separate; the module packages
+therefore do not use `installonlypkg(kernel-module)`, which would attempt to
+co-install conflicting payload versions for one ABI.
 
 Secure Boot is not disabled. At install, the upstream Linux sign-file utility
 (compiled on COPR) can sign the downloaded modules with an existing root-only

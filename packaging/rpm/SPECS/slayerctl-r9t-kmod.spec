@@ -6,7 +6,7 @@
 %global copr_build 0
 Name: slayerctl-r9t-kmod
 Version: 0.1.1
-Release: 1.%{copr_build}%{?dist}
+Release: 2.%{copr_build}%{?dist}
 Summary: Exact-model Slayer R9T controls and hwmon bridge
 License: GPL-2.0-only
 URL: https://github.com/MCC45TR/gg-slayer
@@ -30,7 +30,9 @@ Summary: Exact-model Slayer R9T controls and hwmon bridge for %{kver}
 Requires: kernel-uname-r = %{kver}
 Requires: slayerctl
 Provides: kernel-modules-for-kernel = %{kver}
-Provides: installonlypkg(kernel-module)
+# The name already includes the kernel ABI: retain different-ABI packages,
+# but upgrade this ABI's payload normally. installonly would co-install two
+# versions owning the same .ko and prevent migration from the local packages.
 %description -n kmod-slayerctl-r9t-%{kver}
 Binary module built on COPR against the exact %{kver} headers.
 
@@ -54,5 +56,7 @@ printf 'slayerctl_r9t\n' > %{buildroot}%{_sysconfdir}/modules-load.d/slayerctl-r
 %files -n kmod-slayerctl-r9t-%{kver}
 %{_prefix}/lib/modules/%{kver}/extra/slayerctl-r9t/
 %changelog
+* Sat Nov 14 2026 MCC45TR <mcc45tr@gmail.com> - 0.1.1-2
+- Allow normal DNF upgrades of the payload for the same kernel ABI.
 * Sat Nov 14 2026 MCC45TR <mcc45tr@gmail.com> - 0.1.1-1
 - Build binary modules on COPR and sign with an existing enrolled MOK at install.
