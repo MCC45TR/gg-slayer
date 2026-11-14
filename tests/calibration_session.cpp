@@ -35,6 +35,17 @@ public Q_SLOTS:
 Q_SIGNALS:
     void SessionSettingsChanged();
 };
+class KeyboardPolicy final:public QObject {
+    Q_OBJECT
+    Q_CLASSINFO("D-Bus Interface","org.kde.Solid.PowerManagement.PolicyAgent")
+    Q_PROPERTY(uint SupportedInhibitionTypes READ supported CONSTANT)
+public:
+    uint supported() const {return 13u;}
+    uint calls=0,releases=0,lastTypes=0;
+public Q_SLOTS:
+    uint AddInhibition(uint types,const QString&,const QString&){++calls;lastTypes=types;return calls;}
+    void ReleaseInhibition(uint){++releases;}
+};
 class Mutter final:public QObject {
     Q_OBJECT
     Q_CLASSINFO("D-Bus Interface","org.gnome.Mutter.IdleMonitor")
@@ -55,14 +66,22 @@ static QVariantMap status(const QDBusConnection& bus){auto pending=send(bus,"Sta
 static bool boolean(QDBusPendingCall pending){require(until([&]{return pending.isFinished();}),"Method timeout");QDBusPendingReply<bool> reply=pending;require(!reply.isError(),"Unexpected method error");return reply.value();}
 int main(int argc,char** argv){
     QCoreApplication app(argc,argv);require(argc==2,"Session binary required");
-    auto bus=QDBusConnection::sessionBus();Core core;Mutter mutter;
+    auto bus=QDBusConnection::sessionBus();Core core;Mutter mutter;KeyboardPolicy keyboardPolicy;
     const auto flags=QDBusConnection::ExportAllSlots|QDBusConnection::ExportAllSignals;
     require(bus.registerService("org.gamegaraj.Slayer1")&&bus.registerObject("/org/gamegaraj/Slayer1",&core,flags),"Private core registration");
     require(bus.registerService("org.gnome.Mutter.IdleMonitor")&&bus.registerObject("/org/gnome/Mutter/IdleMonitor/Core",&mutter,flags),"Private idle provider registration");
-    QProcess child;auto env=QProcessEnvironment::systemEnvironment();env.insert("DBUS_SYSTEM_BUS_ADDRESS",qEnvironmentVariable("DBUS_SESSION_BUS_ADDRESS"));env.remove("WAYLAND_DISPLAY");env.remove("DISPLAY");child.setProcessEnvironment(env);child.start(QString::fromLocal8Bit(argv[1]));require(child.waitForStarted(),"Session process startup");
+    require(bus.registerService("org.kde.Solid.PowerManagement")&&bus.registerObject("/org/kde/Solid/PowerManagement/PolicyAgent",&keyboardPolicy,flags|QDBusConnection::ExportAllProperties),"Private keyboard policy registration");
+    QProcess child;auto env=QProcessEnvironment::systemEnvironment();env.insert("DBUS_SYSTEM_BUS_ADDRESS",qEnvironmentVariable("DBUS_SESSION_BUS_ADDRESS"));env.insert("XDG_CURRENT_DESKTOP","KDE");env.remove("WAYLAND_DISPLAY");env.remove("DISPLAY");child.setProcessEnvironment(env);child.start(QString::fromLocal8Bit(argv[1]));require(child.waitForStarted(),"Session process startup");
     require(until([&]{return bus.interface()->isServiceRegistered("org.gamegaraj.Slayer.Session1").value();}),"Session bus name");
     require(until([&]{return status(bus).value("armed").toBool();}),"Idle watch armed");
     require(status(bus).value("backend").toString()==QStringLiteral("internal-keyboard"),"Internal keyboard backend selected");
+    require(until([&]{return status(bus).value("keyboardIdleDelegated").toBool();}),"Keyboard policy delegated");
+    require(keyboardPolicy.calls==1&&keyboardPolicy.lastTypes==8u,"Keyboard delegation inhibited screens or sleep");
+    bus.unregisterService("org.kde.Solid.PowerManagement");
+    require(until([&]{return !status(bus).value("keyboardIdleDelegated").toBool();}),"Stale policy retained after PowerDevil exit");
+    require(bus.registerService("org.kde.Solid.PowerManagement"),"PowerDevil restart registration");
+    require(until([&]{return status(bus).value("keyboardIdleDelegated").toBool();}),"Keyboard delegation not reacquired after restart");
+    require(keyboardPolicy.calls==2&&keyboardPolicy.lastTypes==8u,"Restart duplicated or broadened keyboard policy");
     require(mutter.watches.isEmpty(),"Global idle input must not be monitored");
     Q_EMIT mutter.WatchFired(mutter.lastIdle);
     QCoreApplication::processEvents(QEventLoop::AllEvents,10);

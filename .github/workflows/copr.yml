@@ -10,6 +10,7 @@ on:
           - kernels
           - all
           - slayerctl
+          - powerdevil
 permissions: {}
 jobs:
   copr:
@@ -24,8 +25,9 @@ jobs:
           set -euo pipefail
           case "$PACKAGE_SET" in
             kernels) packages='slayerctl-r9t-kmod ite8291r3-kmod' ;;
-            all) packages='slayerctl slayerctl-r9t-kmod ite8291r3-kmod' ;;
+            all) packages='slayerctl slayerctl-r9t-kmod ite8291r3-kmod powerdevil' ;;
             slayerctl) packages='slayerctl' ;;
+            powerdevil) packages='powerdevil' ;;
             *) exit 2 ;;
           esac
           for package in $packages; do

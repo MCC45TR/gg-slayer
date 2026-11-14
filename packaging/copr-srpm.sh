@@ -30,6 +30,14 @@ case "$spec_name" in
   printf 'obj-m += slayerctl_r9t.o\n' > "$stage/Kbuild"
   tar -czf "$work/SOURCES/slayerctl_r9t.tar.gz" -C "$stage" .
   ;;
+ powerdevil.spec)
+  if ! command -v curl >/dev/null; then dnf -y install curl; fi
+  version=$(sed -n 's/^Version: *//p' "$work/SPECS/$spec_name")
+  for suffix in tar.xz tar.xz.sig; do
+   curl --fail --location --retry 3 --output "$work/SOURCES/powerdevil-$version.$suffix" "https://download.kde.org/stable/plasma/$version/powerdevil-$version.$suffix"
+  done
+  cp "$root/packaging/patches/powerdevil-keyboard-idle-policy.patch" "$work/SOURCES/"
+  ;;
  ite8291r3-kmod.spec)
   tar -czf "$work/SOURCES/ite_8291.tar.gz" -C "$root/kernel/ite8291" Kbuild ite_8291.c color_contract.h color_model.h brightness_contract.h COPYING
   ;;

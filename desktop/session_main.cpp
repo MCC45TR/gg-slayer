@@ -6,6 +6,7 @@
 #include <QDBusInterface>
 #include <QDBusPendingCallWatcher>
 #include <QDBusPendingReply>
+#include <QDBusVariant>
 #include <QDBusServiceWatcher>
 #include <QTimer>
 #include <QVariantMap>
@@ -24,6 +25,51 @@ class Session final:public QObject,protected QDBusContext {
     Q_CLASSINFO("D-Bus Interface","org.gamegaraj.Slayer.Session1")
     QTimer exitTimer;
     QDBusServiceWatcher root;
+    QDBusServiceWatcher powerDevil;
+    uint keyboardPolicyCookie=0;
+    quint64 keyboardPolicyGeneration=0;
+    bool keyboardPolicyWanted=false,keyboardPolicyPending=false;
+    const bool kde=qEnvironmentVariable("XDG_CURRENT_DESKTOP").split(u':').contains("KDE",Qt::CaseInsensitive);
+    QString keyboardPolicyOwner,keyboardPolicyError;
+    static QDBusMessage policyCall(const QString& destination,const QString& method){
+        return QDBusMessage::createMethodCall(destination,"/org/kde/Solid/PowerManagement/PolicyAgent","org.kde.Solid.PowerManagement.PolicyAgent",method);
+    }
+    static void releasePolicy(const QString& destination,uint cookie){
+        auto msg=policyCall(destination,"ReleaseInhibition");msg<<cookie;
+        QDBusConnection::sessionBus().asyncCall(msg,2000);
+    }
+    void updateKeyboardPolicy(bool wanted){
+        keyboardPolicyWanted=kde&&wanted;
+        if(!keyboardPolicyWanted){
+            ++keyboardPolicyGeneration;keyboardPolicyPending=false;keyboardPolicyError.clear();
+            if(keyboardPolicyCookie)releasePolicy(keyboardPolicyOwner,std::exchange(keyboardPolicyCookie,0u));
+            return;
+        }
+        if(keyboardPolicyCookie||keyboardPolicyPending)return;
+        keyboardPolicyPending=true;const auto generation=++keyboardPolicyGeneration;
+        auto get=QDBusMessage::createMethodCall("org.kde.Solid.PowerManagement","/org/kde/Solid/PowerManagement/PolicyAgent","org.freedesktop.DBus.Properties","Get");
+        get<<QStringLiteral("org.kde.Solid.PowerManagement.PolicyAgent")<<QStringLiteral("SupportedInhibitionTypes");
+        auto* pending=new QDBusPendingCallWatcher(QDBusConnection::sessionBus().asyncCall(get,2000),this);
+        connect(pending,&QDBusPendingCallWatcher::finished,this,[this,pending,generation]{
+            QDBusPendingReply<QDBusVariant> result=*pending;
+            const auto destination=pending->reply().service();pending->deleteLater();
+            if(generation!=keyboardPolicyGeneration)return;
+            if(result.isError()||!(result.value().variant().toUInt()&8u)){
+                keyboardPolicyPending=false;
+                keyboardPolicyError=tr("KDE klavye bekleme devri kullanılamıyor. COPR PowerDevil güncellemesi gerekiyor.");return;
+            }
+            auto add=policyCall(destination,"AddInhibition");
+            add<<8u<<QStringLiteral("slayerctl")<<tr("Yalnız dahili klavyenin bekleme aydınlatması yönetiliyor");
+            auto* acquired=new QDBusPendingCallWatcher(QDBusConnection::sessionBus().asyncCall(add,2000),this);
+            connect(acquired,&QDBusPendingCallWatcher::finished,this,[this,acquired,generation,destination]{
+                QDBusPendingReply<uint> cookie=*acquired;acquired->deleteLater();
+                if(generation!=keyboardPolicyGeneration){if(!cookie.isError()&&cookie.value())releasePolicy(destination,cookie.value());return;}
+                keyboardPolicyPending=false;
+                if(cookie.isError()||!cookie.value()){keyboardPolicyError=tr("KDE klavye bekleme devri alınamadı.");return;}
+                keyboardPolicyOwner=destination;keyboardPolicyCookie=cookie.value();keyboardPolicyError.clear();
+            });
+        });
+    }
     QDBusServiceWatcher calibrationClients;
     QSet<QString> calibrations;
     QMap<QString,QDBusMessage> calibrationReplies;
@@ -61,6 +107,13 @@ class Session final:public QObject,protected QDBusContext {
     }
 public:
     Session(){
+        powerDevil.setConnection(QDBusConnection::sessionBus());
+        powerDevil.setWatchedServices({QStringLiteral("org.kde.Solid.PowerManagement")});
+        powerDevil.setWatchMode(QDBusServiceWatcher::WatchForOwnerChange);
+        connect(&powerDevil,&QDBusServiceWatcher::serviceOwnerChanged,this,[this](const QString&,const QString&,const QString& newOwner){
+            ++keyboardPolicyGeneration;keyboardPolicyCookie=0;keyboardPolicyPending=false;keyboardPolicyOwner.clear();
+            if(!newOwner.isEmpty())updateKeyboardPolicy(keyboardPolicyWanted);
+        });
         exitTimer.setSingleShot(true);connect(&exitTimer,&QTimer::timeout,qApp,&QCoreApplication::quit);
         calibrationClients.setConnection(QDBusConnection::sessionBus());calibrationClients.setWatchMode(QDBusServiceWatcher::WatchForUnregistration);
         connect(&calibrationClients,&QDBusServiceWatcher::serviceUnregistered,this,[this](const QString& sender){releaseCalibration(sender,false);});
@@ -69,6 +122,7 @@ public:
         connect(&root,&QDBusServiceWatcher::serviceRegistered,this,[this]{Reload();});
         QTimer::singleShot(0,this,&Session::Reload);
     }
+    ~Session() override {updateKeyboardPolicy(false);}
 public Q_SLOTS:
     bool BeginCalibration(){
         if(!calledFromDBus())return false;
@@ -119,7 +173,7 @@ public Q_SLOTS:
         connect(pending,&QDBusPendingCallWatcher::finished,this,[this,pending]{
             QDBusPendingReply<QVariantMap> result=*pending;pending->deleteLater();reloading=false;
             if(reloadPending){reloadPending=false;QTimer::singleShot(0,this,&Session::Reload);}
-            if(result.isError()){error=result.error().message();armed=false;isIdle=false;if(calibrations.isEmpty())exitTimer.start(5200);return;}
+            if(result.isError()){updateKeyboardPolicy(false);error=result.error().message();armed=false;isIdle=false;if(calibrations.isEmpty())exitTimer.start(5200);return;}
             const auto cfg=result.value();const bool wasEnabled=enabled;
             enabled=cfg.value("enabled").toBool();const unsigned timeout=cfg.value("timeout",30).toUInt();
             owner(cfg.value("lightingOwner").toString());
@@ -128,12 +182,15 @@ public Q_SLOTS:
             backend=cfg.value("backend").toString();
             error=cfg.value("idleError").toString();
             seconds=timeout;
+            // This policy affects only automatic keyboard dimming. Hold it while
+            // asleep or explicitly off too, so KDE cannot restore a stale level.
+            updateKeyboardPolicy(enabled&&cfg.value("powerSaver").toBool()&&cfg.value("available").toBool());
             if(enabled||!calibrations.isEmpty()){
                 exitTimer.stop();QDBusConnection::systemBus().asyncCall(QDBusMessage::createMethodCall(service,path,service,"Subscribe"));
             }else exitTimer.start(wasEnabled?5200:2500);
         });
     }
-    QVariantMap Status(){return {{"enabled",enabled},{"armed",armed},{"idle",isIdle},{"timeout",seconds},{"calibrating",!calibrations.isEmpty()},{"backend",backend},{"error",error}};}
+    QVariantMap Status(){return {{"enabled",enabled},{"armed",armed},{"idle",isIdle},{"timeout",seconds},{"calibrating",!calibrations.isEmpty()},{"backend",backend},{"keyboardIdleDelegated",keyboardPolicyCookie!=0},{"error",error.isEmpty()?keyboardPolicyError:error}};}
 };
 int main(int argc,char** argv){
     QCoreApplication app(argc,argv);if(geteuid()==0)return 3;

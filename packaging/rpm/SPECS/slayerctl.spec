@@ -1,6 +1,6 @@
 Name:           slayerctl
 Version:        0.1.3
-Release:        4%{?dist}
+Release:        5%{?dist}
 Summary:        Game Garaj Slayer hardware control backend
 License:        MIT AND LGPL-2.1-or-later
 URL:            https://github.com/MCC45TR/gg-slayer
@@ -17,6 +17,7 @@ BuildRequires:  desktop-backgrounds-kde, xkeyboard-config
 BuildRequires:  dbus-daemon
 Requires:       polkit, systemd, systemd-udev, /usr/bin/systemd-creds
 Recommends:     slayerctl-r9t-kmod, ite8291r3-kmod
+Recommends:     (powerdevil-keyboard-idle-inhibition if powerdevil)
 %{?systemd_requires}
 %global debug_package %{nil}
 %description
