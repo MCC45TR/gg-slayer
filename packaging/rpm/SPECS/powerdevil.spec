@@ -1,8 +1,9 @@
 Name:    powerdevil
 Version: 6.8.3
-Release: 2.slayer2%{?dist}
+Release: 3.slayer3%{?dist}
 Packager: MCC45TR <mcc45tr@gmail.com>
 Provides: powerdevil-keyboard-idle-inhibition = 1
+Provides: powerdevil-keyboard-resume-restore = 1
 Summary: Manages the power consumption settings of a Plasma Shell
 
 License: BSD-3-Clause AND CC0-1.0 AND GPL-2.0-only AND GPL-2.0-or-later AND GPL-3.0-only AND LGPL-2.0-only AND LGPL-2.1-only AND LGPL-2.1-or-later AND LGPL-3.0-only AND (GPL-2.0-only OR GPL-3.0-only) AND (LGPL-2.1-only OR LGPL-3.0-only)
@@ -10,8 +11,11 @@ URL:     https://invent.kde.org/plasma/%{name}
 
 Source0: https://download.kde.org/%{stable_kf6}/plasma/%{version}/%{name}-%{version}.tar.xz
 Source1: https://download.kde.org/%{stable_kf6}/plasma/%{version}/%{name}-%{version}.tar.xz.sig
+Source2: powerdevil-resume-check.py
+Source3: powerdevil-resume-check.cpp
 
 Patch0: powerdevil-keyboard-idle-policy.patch
+Patch1: powerdevil-resume-backlight.patch
 
 # Plasma Dependencies
 BuildRequires:  plasma-workspace-devel
@@ -43,6 +47,7 @@ BuildRequires:  cmake(Plasma)
 BuildRequires:  cmake(PlasmaWaylandProtocols)
 
 BuildRequires:  qt6-qtbase-devel
+BuildRequires:  python3, pkgconfig(Qt6Core)
 BuildRequires:  qt6-qtbase-private-devel
 BuildRequires:  cmake(QCoro6)
 BuildRequires:  cmake(Qt6Qml)
@@ -92,6 +97,9 @@ of a daemon (a KDED module) and a KCModule for its configuration.
 %build
 %cmake_kf6 -DHAVE_DDCUTIL=%DDCUTIL
 %cmake_build
+
+%check
+%{__python3} %{SOURCE2} daemon/powerdevilcore.cpp %{SOURCE3}
 
 
 %install
@@ -147,6 +155,10 @@ rm -fv %{buildroot}/%{_libdir}/libpowerdevil{configcommonprivate,core,ui}.so
 
 
 %changelog
+* Sun Nov 15 2026 MCC45TR <mcc45tr@gmail.com> - 6.8.3-3.slayer3
+- Restore pending keyboard idle brightness after interactive suspend/resume.
+- Defer restoration until resume slots finish; retain background-wake and manual-off policy.
+- Execute the patched Core methods in a deterministic Qt event-loop regression check.
 * Sat Nov 14 2026 MCC45TR <mcc45tr@gmail.com> - 6.8.3-2.slayer2
 - Add independent keyboard-only idle delegation through PolicyAgent.
 - Retain native screen dimming, suspend and explicit brightness controls.

@@ -1,0 +1,31 @@
+From: MCC45TR <mcc45tr@gmail.com>
+Subject: [PATCH] Restore pending idle actions after an interactive resume
+
+The AC state may stay unchanged across suspend, and no idle-resume event is
+guaranteed after lid/button wake. In that case DimDisplay/DPMS keep keyboard
+brightness at zero until an unrelated configuration change. Dispatch their
+existing restoration path after all resume slots have cleared suspend state.
+Background wakes retain the existing display/backlight policy. No polling or
+profile reload; the actions keep ownership of their saved brightness and zero.
+Based on KDE PowerDevil v6.8.3, GPL-2.0-or-later.
+
+diff --git a/daemon/powerdevilcore.cpp b/daemon/powerdevilcore.cpp
+--- a/daemon/powerdevilcore.cpp
++++ b/daemon/powerdevilcore.cpp
+@@ -1002,6 +1002,16 @@ void Core::onResumeFromSuspend() {
+     emitBatteryChargePercentNotification(percent, 1000);
+ 
+     m_batteryController->updateAcAdapterState();
++
++    // Let action-specific resume slots clear their suspend flags first.
++    // A physical wake must restore pending DimDisplay/DPMS brightness even
++    // when AC/profile values did not change and no input event is delivered.
++    const auto wakeup = m_suspendController->lastWakeupType();
++    if (!(wakeup & SuspendController::WakeupSource::Timer)
++        && !(wakeup & SuspendController::WakeupSource::Telephony)
++        && !(wakeup & SuspendController::WakeupSource::Network)) {
++        QTimer::singleShot(0, this, &Core::onResumingFromIdle);
++    }
+ }
+ 
+ void Core::readChargeThreshold()

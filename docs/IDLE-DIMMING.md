@@ -73,6 +73,20 @@ bekler; sürekli sensör taraması yapmaz. Bekleme ışığı/profil eşitlemesi
 kalibrasyon ve aktif arayüz istemcisi yoksa broker beş saniyede kapanır.
 Salt okunur durum sorgusu kapalı kullanıcı köprüsünü başlatmaz.
 
+## Uykudan dönüşte KDE parlaklığı
+
+PowerDevil `6.8.3-3.slayer3`, kullanıcı kaynaklı uyanışta beklemeden çıkış için
+bekleyen yerel eylemleri yeniden çalıştırır. Böylece DimDisplay/DPMS'nin
+hatırladığı klavye parlaklığı, güç profili/adaptör durumu değişmese ve henüz
+bir giriş olayı gelmese de geri yüklenir. İşlem, diğer uyanış işleyicileri
+tamamlandıktan sonra tek bir Qt olayı olarak çalışır; sürekli sorgu eklemez.
+
+Zamanlayıcı, ağ ve telefon kaynaklı arka plan uyanışlarında ışık açılmaz.
+Sıfır parlaklık ve ctl klavye devriyle ilgili mevcut eylem denetimleri korunur;
+kullanıcının KDE ayarlarını değiştirmesi veya profili yeniden yüklemesi gerekmez.
+Test, gerçek PowerDevil Core uyanış/idle yöntemlerini sınırlı Qt fixture'ında
+çalıştırır; fiziksel uyku/uyanma kabulünün yerini almaz.
+
 0.1.4'te aktif/bekleme geçişi tek bir hareket modeli kullanır. Aktif hedef
 KDE'nin seçtiği mantıksal parlaklık; bekleme hedefi görünür %4 tabandır.
 Yarıda gelen yerleşik tuş basışı, son USB kademesinden bağımsız olarak o anki

@@ -37,6 +37,8 @@ case "$spec_name" in
    curl --fail --location --retry 3 --output "$work/SOURCES/powerdevil-$version.$suffix" "https://download.kde.org/stable/plasma/$version/powerdevil-$version.$suffix"
   done
   cp "$root/packaging/patches/powerdevil-keyboard-idle-policy.patch" "$work/SOURCES/"
+  cp "$root/packaging/patches/powerdevil-resume-backlight.patch" "$work/SOURCES/"
+  cp "$root/packaging/powerdevil-resume-check.py" "$root/packaging/powerdevil-resume-check.cpp" "$work/SOURCES/"
   ;;
  ite8291r3-kmod.spec)
   tar -czf "$work/SOURCES/ite_8291.tar.gz" -C "$root/kernel/ite8291" Kbuild ite_8291.c color_contract.h color_model.h brightness_contract.h COPYING
