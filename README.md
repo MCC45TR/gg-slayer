@@ -4,10 +4,10 @@ Geliştirici: **MCC45TR <mcc45tr@gmail.com>**
 
 Game Garaj Slayer R9T için donanım kontrolü ve yerel Linux arayüzleri.
 Fedora **45 x86_64** ve **Rawhide x86_64** paketleri
-[COPR](https://copr.fedorainfracloud.org/coprs/mcc45tr/gg-slayer/) üzerinde derlenir.
+[COPR](https://copr.fedorainfracloud.org/coprs/mcc45tr/mcc-support/) üzerinde derlenir.
 
 ```sh
-sudo dnf copr enable mcc45tr/gg-slayer
+sudo dnf copr enable mcc45tr/mcc-support
 sudo dnf install slayerctl slayer-control-qt slayer-face-auth
 sudo dnf upgrade --refresh 'slayer*' 'ite8291r3*' 'kmod-slayerctl*' 'kmod-ite8291r3*'
 ```
@@ -135,9 +135,9 @@ paketini derler. `.copr/Makefile` yalnız sunucuda kaynak RPM hazırlar; C++/QML
 kontrolleri, arayüz çizimleri ve kernel modülleri COPR chroot'larında üretilir.
 
 ```sh
-copr-cli build-package mcc45tr/gg-slayer --name slayerctl --nowait
-copr-cli build-package mcc45tr/gg-slayer --name slayerctl-r9t-kmod --nowait
-copr-cli build-package mcc45tr/gg-slayer --name ite8291r3-kmod --nowait
+copr-cli build-package mcc45tr/mcc-support --name slayerctl --nowait
+copr-cli build-package mcc45tr/mcc-support --name slayerctl-r9t-kmod --nowait
+copr-cli build-package mcc45tr/mcc-support --name ite8291r3-kmod --nowait
 ```
 
 Yerel Qt/Kirigami beceri yönergeleri `skills/` içindedir. Eski Widgets uygulaması

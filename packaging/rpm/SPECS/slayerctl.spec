@@ -1,6 +1,6 @@
 Name:           slayerctl
 Version:        0.1.6
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        Game Garaj Slayer hardware control backend
 License:        MIT AND LGPL-2.1-or-later
 URL:            https://github.com/MCC45TR/gg-slayer
@@ -80,9 +80,9 @@ install -D -m0644 packaging/slayer-control-gtk.desktop %{buildroot}%{_datadir}/a
 install -D -m0644 packaging/slayerctl.preset %{buildroot}%{_presetdir}/90-slayerctl.preset
 install -d %{buildroot}%{_sysconfdir}/slayerctl/fan-curves %{buildroot}%{_sysconfdir}/yum.repos.d
 %if 0%{?fedora} == 45
-sed 's/@CHROOT@/fedora-45/g' packaging/gg-slayer.repo.in > %{buildroot}%{_sysconfdir}/yum.repos.d/_copr:copr.fedorainfracloud.org:mcc45tr:gg-slayer.repo
+sed 's/@CHROOT@/fedora-45/g' packaging/mcc-support.repo.in > %{buildroot}%{_sysconfdir}/yum.repos.d/_copr:copr.fedorainfracloud.org:mcc45tr:mcc-support.repo
 %else
-sed 's/@CHROOT@/fedora-rawhide/g' packaging/gg-slayer.repo.in > %{buildroot}%{_sysconfdir}/yum.repos.d/_copr:copr.fedorainfracloud.org:mcc45tr:gg-slayer.repo
+sed 's/@CHROOT@/fedora-rawhide/g' packaging/mcc-support.repo.in > %{buildroot}%{_sysconfdir}/yum.repos.d/_copr:copr.fedorainfracloud.org:mcc45tr:mcc-support.repo
 %endif
 
 install -D -m0644 packaging/slayer-control-qt.metainfo.xml %{buildroot}%{_datadir}/metainfo/io.github.MCC45TR.slayer_control_qt.metainfo.xml
@@ -132,7 +132,7 @@ desktop-file-validate %{buildroot}%{_datadir}/applications/slayer-control-gtk.de
 %dir %{_sysconfdir}/slayerctl/fan-curves
 %attr(0600,root,root) %config(noreplace) %{_sysconfdir}/slayerctl/slayerctl.conf
 %config(noreplace) %{_sysconfdir}/slayerctl/rgb-profiles/*.conf
-%config(noreplace) %{_sysconfdir}/yum.repos.d/_copr:copr.fedorainfracloud.org:mcc45tr:gg-slayer.repo
+%config(noreplace) %{_sysconfdir}/yum.repos.d/_copr:copr.fedorainfracloud.org:mcc45tr:mcc-support.repo
 
 %files -n slayer-control-qt
 %{_bindir}/slayer-control-qt
@@ -155,6 +155,8 @@ desktop-file-validate %{buildroot}%{_datadir}/applications/slayer-control-gtk.de
 %{_datadir}/applications/slayer-control-gtk.desktop
 
 %changelog
+* Sat Nov 21 2026 MCC45TR <75160848+MCC45TR@users.noreply.github.com> - 0.1.6-2
+- Ship the MCC Support repository configuration.
 * Sat Nov 14 2026 MCC45TR <mcc45tr@gmail.com> - 0.1.6-1
 - Remove the redundant Slayer camera applet and its backend; retain KDE's own indicator.
 * Sat Nov 14 2026 MCC45TR <mcc45tr@gmail.com> - 0.1.5-1

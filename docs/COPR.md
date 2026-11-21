@@ -3,11 +3,11 @@
 Developer: **MCC45TR <mcc45tr@gmail.com>**
 
 Source: https://github.com/MCC45TR/gg-slayer
-Repository: https://copr.fedorainfracloud.org/coprs/mcc45tr/gg-slayer/
+Repository: https://copr.fedorainfracloud.org/coprs/mcc45tr/mcc-support/
 Targets: **fedora-rawhide-x86_64**, **fedora-45-x86_64**.
 
 ```
-sudo dnf copr enable mcc45tr/gg-slayer
+sudo dnf copr enable mcc45tr/mcc-support
 sudo dnf install slayerctl slayer-control-qt slayer-face-auth
 # GNOME placeholder, when wanted:
 sudo dnf install slayer-control-gtk
@@ -15,6 +15,15 @@ sudo dnf upgrade --refresh slayerctl slayer-control-qt slayer-face-auth
 # KDE: independent keyboard idle policy, without screen/sleep inhibition:
 sudo dnf upgrade --refresh powerdevil
 ```
+
+For an existing installation that still uses the old COPR, disable that repository and enable MCC Support.
+
+```sh
+sudo dnf copr disable mcc45tr/gg-slayer
+sudo dnf copr enable mcc45tr/mcc-support
+sudo dnf --refresh upgrade 'slayer*' 'ite8291r3*' 'kmod-slayerctl*' 'kmod-ite8291r3*'
+```
+
 
 The core RPM includes the signed COPR repository configuration. Installing an
 RPM directly also enables future DNF updates. Package GPG verification stays on.
